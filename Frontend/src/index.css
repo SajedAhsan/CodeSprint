@@ -1,0 +1,19 @@
+@import "tailwindcss";
+
+@layer base {
+  html {
+    @apply scroll-smooth;
+  }
+
+  body {
+    @apply m-0 min-w-[320px] bg-slate-50 font-sans text-slate-900 antialiased;
+  }
+
+  #root {
+    @apply min-h-screen w-full;
+  }
+
+  img {
+    @apply max-w-full;
+  }
+}
