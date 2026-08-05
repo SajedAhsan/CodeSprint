@@ -9,9 +9,8 @@ export default function FeaturesSection({ features, onFeatureSelect }) {
       <div className="mt-5 grid gap-4 lg:grid-cols-3">
         {features.map((feature) => (
           <article
-            className={`rounded-[24px] border border-slate-200/80 bg-white p-5 shadow-[0_16px_34px_rgba(58,94,146,0.1)] transition-transform hover:-translate-y-0.5 ${
-              onFeatureSelect ? 'cursor-pointer' : ''
-            }`}
+            className={`rounded-[24px] border border-slate-200/80 bg-white p-5 shadow-[0_16px_34px_rgba(58,94,146,0.1)] transition-transform hover:-translate-y-0.5 ${onFeatureSelect ? 'cursor-pointer' : ''
+              }`}
             key={feature.key}
             role={typeof onFeatureSelect === 'function' ? 'button' : undefined}
             tabIndex={typeof onFeatureSelect === 'function' ? 0 : undefined}
