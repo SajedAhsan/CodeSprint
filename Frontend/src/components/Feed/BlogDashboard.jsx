@@ -1,9 +1,11 @@
 import blogHeroImg from '../../assets/LandingPage/blog.png'
-import { blogPosts, quickStats } from './blogFeedContent'
+import { blogPosts as defaultBlogPosts, quickStats } from './blogFeedContent'
 import BlogNavbar from './BlogNavbar'
 import BlogCard from './BlogCard'
 
-export default function BlogDashboard({ onNavigateBlog, onNavigateProblems, onNavigatePostBlog, onNavigateProfile, onNavigateRoadmap }) {
+export default function BlogDashboard({ onNavigateBlog, onNavigateProblems, onNavigatePostBlog, onNavigateProfile, onNavigateRoadmap, blogPosts }) {
+  const visiblePosts = blogPosts || defaultBlogPosts
+
   return (
     <main className="min-h-screen bg-[radial-gradient(circle_at_top_left,rgba(59,130,246,0.16),transparent_28%),radial-gradient(circle_at_top_right,rgba(37,99,235,0.12),transparent_24%),linear-gradient(180deg,#f7fbff_0%,#eef5ff_100%)] text-slate-900">
       <BlogNavbar
@@ -54,7 +56,7 @@ export default function BlogDashboard({ onNavigateBlog, onNavigateProblems, onNa
 
       <section className="mx-auto max-w-7xl px-4 pb-12 sm:px-6 lg:px-8 lg:pb-16">
         <div className="grid gap-6">
-          {blogPosts.map((post) => (
+          {visiblePosts.map((post) => (
             <BlogCard key={post.id} post={post} />
           ))}
         </div>

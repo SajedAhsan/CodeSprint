@@ -1,4 +1,4 @@
-import { useState, Fragment, useMemo } from 'react'
+import { useEffect, useState, Fragment } from 'react'
 import BlogNavbar from './BlogNavbar'
 import ProblemPage from '../Problem/ProblemPage'
 
@@ -247,13 +247,91 @@ function ProgressChart({ topicName, problems }) {
 /* ════════════════════════════════════════════════════════════
    ProblemsPage
 ════════════════════════════════════════════════════════════ */
-export default function ProblemsPage({ onNavigateBlog, onNavigateProblems, onNavigatePostBlog, onNavigateProfile, onNavigateRoadmap }) {
+export default function ProblemsPage({
+  onNavigateBlog,
+  onNavigateProblems,
+  onNavigatePostBlog,
+  onNavigateProfile,
+  onNavigateRoadmap,
+  problemsByTopic: controlledProblemsByTopic,
+  setProblemsByTopic: controlledSetProblemsByTopic,
+}) {
   const [selectedTopic, setSelectedTopic] = useState('Basic Problems')
-  const [problemsByTopic, setProblemsByTopic] = useState(initializeAllProblems)
+  const [localProblemsByTopic, setLocalProblemsByTopic] = useState(initializeAllProblems)
   const [activeProblem, setActiveProblem] = useState(null)
+  const [topics, setTopics] = useState(problemTopics)
+  const [loadingProblems, setLoadingProblems] = useState(true)
   const [initialTab, setInitialTab] = useState('Discussion')
   const [openNotesId, setOpenNotesId] = useState(null)
   const [openConceptId, setOpenConceptId] = useState(null)
+
+  const problemsByTopic = controlledProblemsByTopic || localProblemsByTopic
+  const setProblemsByTopic = controlledSetProblemsByTopic || setLocalProblemsByTopic
+
+  useEffect(() => {
+    const loadProblems = async () => {
+      try {
+        setLoadingProblems(true)
+        const endpoint = '/api/problems'
+        const response = await fetch(endpoint, { headers: { Accept: 'application/json' } })
+        if (!response.ok) throw new Error('Unable to load problems')
+
+        const payload = await response.json()
+        const grouped = {}
+
+        payload.forEach((problem) => {
+          const topicName = problem.topic || 'Basic Problems'
+          if (!grouped[topicName]) grouped[topicName] = []
+
+          // transform editorial response to UI shape
+          let solution = null
+          if (problem.solution) {
+            const codes = {}
+            if (Array.isArray(problem.solution.solutions)) {
+              problem.solution.solutions.forEach((s) => {
+                if (s.language) codes[s.language] = s.code || ''
+              })
+            }
+            solution = {
+              explanation: problem.solution.explanation || '',
+              codes: Object.keys(codes).length ? codes : (problem.solution.code ? { [problem.solution.language || 'Code']: problem.solution.code } : {}),
+              video: problem.solution.videoLink || problem.solution.video || null,
+            }
+          }
+
+          grouped[topicName].push({
+            id: problem.problemId,
+            name: problem.title,
+            difficulty: problem.difficulty || 'Medium',
+            solved: false,
+            bookmarked: false,
+            notes: '',
+            concept: problem.concept || '',
+            judgeUrl: problem.externalLink || 'https://codeforces.com/problemset',
+            solution,
+          })
+        })
+
+        const nextTopics = Object.keys(grouped).filter((topic) => grouped[topic].length > 0)
+        const nextProblemsByTopic = {
+          ...initializeAllProblems(),
+          ...grouped,
+        }
+
+        setTopics(nextTopics.length > 0 ? nextTopics : problemTopics)
+        setProblemsByTopic(nextProblemsByTopic)
+        if (!nextTopics.includes(selectedTopic) && nextTopics.length > 0) {
+          setSelectedTopic(nextTopics[0])
+        }
+      } catch (error) {
+        console.error(error)
+      } finally {
+        setLoadingProblems(false)
+      }
+    }
+
+    loadProblems()
+  }, [])
 
   /* ── Topic-level helpers ── */
   const updateRow = (id, patch) =>
@@ -284,6 +362,7 @@ export default function ProblemsPage({ onNavigateBlog, onNavigateProblems, onNav
   }
 
   const currentProblems = problemsByTopic[selectedTopic] || []
+  const hasProblemsForSelectedTopic = currentProblems.length > 0
 
   /* ── Render ProblemPage if a problem is selected ── */
   if (activeProblem) {
@@ -328,7 +407,7 @@ export default function ProblemsPage({ onNavigateBlog, onNavigateProblems, onNav
           <aside className="rounded-xl border border-slate-200 bg-white/95 p-4 shadow-sm self-start lg:sticky lg:top-4 max-h-[calc(100vh-120px)] flex flex-col">
             <p className="px-1 pb-3 text-[11px] font-bold uppercase tracking-widest text-slate-400">Topics</p>
             <div className="space-y-0.5 overflow-y-auto flex-1 pr-0.5">
-              {problemTopics.map((topic) => {
+              {topics.map((topic) => {
                 const isSelected = topic === selectedTopic
                 return (
                   <button
@@ -369,7 +448,20 @@ export default function ProblemsPage({ onNavigateBlog, onNavigateProblems, onNav
                   </tr>
                 </thead>
                 <tbody>
-                  {currentProblems.map((row) => {
+                  {loadingProblems ? (
+                    <tr>
+                      <td colSpan={8} className="px-5 py-8 text-center text-sm text-slate-500">
+                        Loading problems...
+                      </td>
+                    </tr>
+                  ) : !hasProblemsForSelectedTopic ? (
+                    <tr>
+                      <td colSpan={8} className="px-5 py-8 text-center text-sm text-slate-500">
+                        Problems will be added for this topic soon.
+                      </td>
+                    </tr>
+                  ) : (
+                    currentProblems.map((row) => {
                     const isSolved = row.solved
                     const isBookmarked = row.bookmarked
                     const isNotesOpen = openNotesId === row.id
@@ -532,7 +624,8 @@ export default function ProblemsPage({ onNavigateBlog, onNavigateProblems, onNav
                         )}
                       </Fragment>
                     )
-                  })}
+                  })
+                  )}
                 </tbody>
               </table>
             </div>

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 
 import LandingPage from './components/LandingPage/LandingPage'
 import AuthPage from './components/Auth/AuthPage'
@@ -7,15 +7,80 @@ import ProblemsPage from './components/Feed/ProblemsPage'
 import BlogPostPage from './components/Feed/BlogPostPage'
 import ProfilePage from './components/Profile/ProfilePage'
 import RoadmapPage from './components/Roadmap/RoadmapPage'
+import AdminDashboard from './components/Admin/AdminDashboard'
+import { createInitialBlogPosts, createInitialProblems } from './components/Shared/platformContent'
 
 export default function App(props) {
   const [view, setView] = useState('landing')
+  const [problemsByTopic, setProblemsByTopic] = useState({})
+  const [blogPosts, setBlogPosts] = useState(createInitialBlogPosts)
+
+  useEffect(() => {
+    const fetchProblems = async () => {
+      try {
+        const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? ''
+        const endpoint = API_BASE_URL ? `${API_BASE_URL}/api/problems` : '/api/problems'
+        const res = await fetch(endpoint)
+        if (res.ok) {
+          const data = await res.json()
+          const grouped = {}
+          data.forEach(p => {
+            const topic = p.topic || 'Arrays & Hashing' // default topic if null
+            if (!grouped[topic]) {
+              grouped[topic] = []
+            }
+            // Avoid duplicate by ID
+            if (!grouped[topic].find(ex => ex.id === p.problemId)) {
+              grouped[topic].push({
+                id: p.problemId,
+                name: p.title,
+                difficulty: p.difficulty,
+                concept: p.concept,
+                judgeUrl: p.externalLink || 'https://codeforces.com/problemset',
+                solved: false,
+                bookmarked: false,
+                notes: '',
+              })
+            }
+          })
+          setProblemsByTopic(grouped)
+        }
+      } catch (err) {
+        console.error('Failed to fetch problems', err)
+      }
+    }
+    fetchProblems()
+  }, [])
+
+  const handleLogin = (responseBody) => {
+    const nextRole = responseBody?.role === 'admin' || responseBody?.username?.toLowerCase?.() === 'admin' ? 'admin' : 'user'
+    localStorage.setItem('codesprintRole', nextRole)
+    setView(nextRole === 'admin' ? 'admin' : 'feed')
+  }
 
   if (view === 'auth') {
     return (
       <AuthPage
         onBackToLanding={() => setView('landing')}
-        onLogin={() => setView('feed')}
+        onLogin={handleLogin}
+        {...props}
+      />
+    )
+  }
+
+  if (view === 'admin') {
+    return (
+      <AdminDashboard
+        onBackToLanding={() => setView('landing')}
+        onNavigateProblems={() => setView('problems')}
+        onNavigateBlog={() => setView('feed')}
+        onNavigatePostBlog={() => setView('post-blog')}
+        onNavigateProfile={() => setView('profile')}
+        onNavigateRoadmap={() => setView('roadmap')}
+        problemsByTopic={problemsByTopic}
+        setProblemsByTopic={setProblemsByTopic}
+        blogPosts={blogPosts}
+        setBlogPosts={setBlogPosts}
         {...props}
       />
     )
@@ -30,6 +95,7 @@ export default function App(props) {
         onNavigatePostBlog={() => setView('post-blog')}
         onNavigateProfile={() => setView('profile')}
         onNavigateRoadmap={() => setView('roadmap')}
+        blogPosts={blogPosts}
         {...props}
       />
     )
@@ -44,6 +110,8 @@ export default function App(props) {
         onNavigatePostBlog={() => setView('post-blog')}
         onNavigateProfile={() => setView('profile')}
         onNavigateRoadmap={() => setView('roadmap')}
+        problemsByTopic={problemsByTopic}
+        setProblemsByTopic={setProblemsByTopic}
         {...props}
       />
     )
@@ -58,6 +126,7 @@ export default function App(props) {
         onNavigatePostBlog={() => setView('post-blog')}
         onNavigateProfile={() => setView('profile')}
         onNavigateRoadmap={() => setView('roadmap')}
+        blogPosts={blogPosts}
         {...props}
       />
     )
@@ -72,6 +141,7 @@ export default function App(props) {
         onNavigatePostBlog={() => setView('post-blog')}
         onNavigateProfile={() => setView('profile')}
         onNavigateRoadmap={() => setView('roadmap')}
+        blogPosts={blogPosts}
         {...props}
       />
     )
@@ -85,6 +155,7 @@ export default function App(props) {
         onNavigatePostBlog={() => setView('post-blog')}
         onNavigateProfile={() => setView('profile')}
         onNavigateRoadmap={() => setView('roadmap')}
+        blogPosts={blogPosts}
         {...props}
       />
     )

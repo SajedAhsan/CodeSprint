@@ -6,6 +6,19 @@ function cn(...classes) {
   return classes.filter(Boolean).join(' ')
 }
 
+function getEmbedUrl(url) {
+  if (!url) return ''
+  // If it's already an embed URL or not a youtube URL, return as-is
+  if (url.includes('youtube.com/embed/')) return url
+  // Match standard youtube and youtu.be links
+  const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|&v=)([^#&?]*).*/
+  const match = url.match(regExp)
+  if (match && match[2].length === 11) {
+    return `https://www.youtube.com/embed/${match[2]}`
+  }
+  return url
+}
+
 function TabButton({ active, children, onClick }) {
   return (
     <button
@@ -150,6 +163,7 @@ export default function ProblemPage({ onBack, initialTab = 'Discussion', problem
   const [replyTargetId, setReplyTargetId] = useState(null)
   const [replyText, setReplyText] = useState('')
   const [codeLang, setCodeLang] = useState('C++')
+  const [solutionTab, setSolutionTab] = useState('Code')
 
   /* ── handlers ── */
   const handlePostComment = (e) => {
@@ -337,69 +351,91 @@ export default function ProblemPage({ onBack, initialTab = 'Discussion', problem
             <div className="space-y-6">
               {problem.solution ? (
                 <article className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-                  <div className="grid lg:grid-cols-[1fr_1fr]">
-                    {/* Editorial text + code */}
-                    <div className="p-5 sm:p-6">
-                      <p className="text-xs font-bold uppercase tracking-[0.22em] text-blue-700">
-                        Editorial Walkthrough
-                      </p>
-                      <p className="mt-3 text-sm leading-relaxed text-slate-600">
-                        {problem.solution.explanation}
-                      </p>
-                      <div className="mt-5 overflow-hidden rounded-2xl border border-slate-800 bg-slate-950 shadow-lg">
-                        <div className="flex items-center justify-between px-4 py-2 border-b border-white/10">
-                          <span className="text-xs font-semibold text-slate-400">Solution</span>
-                          <div className="flex gap-1">
-                            {['C++', 'Java', 'Python'].map((lang) => (
-                              <button
-                                key={lang}
-                                type="button"
-                                onClick={() => setCodeLang(lang)}
-                                className={cn(
-                                  'px-3 py-1 rounded-full text-[11px] font-bold transition-all',
-                                  codeLang === lang
-                                    ? 'bg-blue-600 text-white shadow-sm'
-                                    : 'text-slate-400 hover:text-slate-200 hover:bg-white/10',
-                                )}
-                              >
-                                {lang}
-                              </button>
-                            ))}
-                          </div>
-                        </div>
-                        <pre className="overflow-x-auto px-4 py-4 text-sm leading-6 text-slate-100 font-mono">
-                          <code>{problem.solution.codes?.[codeLang] || problem.solution.code || ''}</code>
-                        </pre>
-                      </div>
-                    </div>
-
-                    {/* Video */}
-                    <div className="border-t lg:border-t-0 lg:border-l border-slate-200 bg-slate-50/70 p-4 sm:p-6 flex items-center justify-center">
-                      {problem.solution.video ? (
-                        <iframe
-                          title="Solution Video"
-                          src={problem.solution.video}
-                          className="aspect-video w-full rounded-2xl border border-slate-200 shadow-sm"
-                          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                          allowFullScreen
-                        />
-                      ) : (
-                        <div className="flex flex-col items-center text-center py-10">
-                          <div className="w-12 h-12 rounded-full bg-blue-50 flex items-center justify-center mb-3">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="text-blue-400">
-                              <polygon points="5 3 19 12 5 21 5 3" />
-                            </svg>
-                          </div>
-                          <p className="text-sm text-slate-400">No video available</p>
-                        </div>
+                  {/* Solution Sub-tabs */}
+                  <div className="border-b border-slate-200 px-5 py-3.5 bg-slate-50/50">
+                    <div className="flex flex-wrap gap-2">
+                      <TabButton active={solutionTab === 'Code'} onClick={() => setSolutionTab('Code')}>
+                        Code Solution
+                      </TabButton>
+                      {problem.solution.explanation && (
+                        <TabButton active={solutionTab === 'Explanation'} onClick={() => setSolutionTab('Explanation')}>
+                          Explanation
+                        </TabButton>
+                      )}
+                      {problem.solution.video && (
+                        <TabButton active={solutionTab === 'Video'} onClick={() => setSolutionTab('Video')}>
+                          Video Walkthrough
+                        </TabButton>
                       )}
                     </div>
                   </div>
+
+                  <div className="p-5 sm:p-6 min-h-[400px]">
+                    {solutionTab === 'Code' && (
+                      <div className="h-full flex flex-col">
+                        <div className="overflow-hidden rounded-2xl border border-slate-800 bg-slate-950 shadow-lg flex-1">
+                          <div className="flex items-center justify-between px-4 py-3 border-b border-white/10 bg-slate-900/50">
+                            <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Implementation</span>
+                            <div className="flex gap-1.5">
+                              {['C++', 'Java', 'Python'].map((lang) => (
+                                <button
+                                  key={lang}
+                                  type="button"
+                                  onClick={() => setCodeLang(lang)}
+                                  className={cn(
+                                    'px-3 py-1 rounded-full text-[11px] font-bold transition-all',
+                                    codeLang === lang
+                                      ? 'bg-blue-600 text-white shadow-sm'
+                                      : 'text-slate-400 hover:text-slate-200 hover:bg-white/10',
+                                  )}
+                                >
+                                  {lang}
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                          <pre className="overflow-x-auto px-5 py-5 text-sm leading-relaxed text-slate-100 font-mono">
+                            <code>{problem.solution.codes?.[codeLang] || problem.solution.code || 'No code provided for this language.'}</code>
+                          </pre>
+                        </div>
+                      </div>
+                    )}
+
+                    {solutionTab === 'Explanation' && problem.solution.explanation && (
+                      <div className="animate-in fade-in slide-in-from-bottom-2 duration-300">
+                        <p className="text-xs font-bold uppercase tracking-[0.22em] text-blue-700 mb-4">
+                          Editorial Walkthrough
+                        </p>
+                        <div className="prose prose-slate max-w-none text-sm leading-loose text-slate-700 whitespace-pre-wrap">
+                          {problem.solution.explanation}
+                        </div>
+                      </div>
+                    )}
+
+                    {solutionTab === 'Video' && problem.solution.video && (
+                      <div className="animate-in fade-in zoom-in-95 duration-300 max-w-4xl mx-auto flex flex-col items-center justify-center">
+                        <iframe
+                          title="Solution Video"
+                          src={getEmbedUrl(problem.solution.video)}
+                          className="aspect-video w-full rounded-2xl border border-slate-200 shadow-xl"
+                          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                          allowFullScreen
+                        />
+                      </div>
+                    )}
+                  </div>
                 </article>
               ) : (
-                <div className="flex flex-col items-center py-16 text-center">
-                  <p className="text-sm font-semibold text-slate-500">No solution available yet</p>
-                  <p className="text-xs text-slate-400 mt-1">Check back later or discuss approaches in the Discussion tab.</p>
+                <div className="flex flex-col items-center py-16 text-center rounded-2xl border border-dashed border-slate-200 bg-slate-50/50">
+                  <div className="w-12 h-12 rounded-full bg-slate-100 flex items-center justify-center mb-3">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-slate-400">
+                      <circle cx="12" cy="12" r="10" />
+                      <line x1="12" y1="8" x2="12" y2="12" />
+                      <line x1="12" y1="16" x2="12.01" y2="16" />
+                    </svg>
+                  </div>
+                  <p className="text-sm font-semibold text-slate-600">Coming soon</p>
+                  <p className="text-xs text-slate-500 mt-1 max-w-xs">Check back later or discuss approaches with the community in the Discussion tab.</p>
                 </div>
               )}
             </div>

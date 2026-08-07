@@ -1,1 +1,112 @@
+# === Root-level gitignore for combined Java (Maven) + Node (Vite) project ===
+
+#########################
+# Java / Maven
+#########################
+# Maven build output
+target/
+**/target/
+
+# Compiled class files and archives
+*.class
+*.jar
+*.war
+*.ear
+
+# JVM crash logs
+hs_err_pid*
+
+# Keep Maven wrapper files tracked; ignore wrapper caches
+.mvn/wrapper/maven-wrapper.jar
+
+#########################
+# Node / Frontend
+#########################
+# Node modules
+node_modules/
+**/node_modules/
+
+# Production / build outputs
+dist/
+build/
+public/build/
+
+# Vite / tooling caches
+.vite/
+.cache/
+.parcel-cache/
+.turbo/
+
+# npm / pnpm / yarn logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+#########################
+# Environment / secret files
+#########################
+# Ignore environment files but allow example files
+.env
+.env.*
+.env.local
+!.env.example
+
+#########################
+# IDEs, editors, OS
+#########################
+# VS Code
+.vscode/
+
+# JetBrains IDEs (IntelliJ, WebStorm, etc.)
+.idea/
+*.iml
+*.ipr
+*.iws
+
+# Eclipse
+.classpath
+.project
+.settings/
+
+# macOS
+.DS_Store
+
+# Windows
+Thumbs.db
+desktop.ini
+
+#########################
+# Logs, coverage, temp
+#########################
+logs/
+*.log
+coverage/
+.nyc_output/
+coverage-final.json
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+*.temp
+*.bak
+*.swp
+
+#########################
+# IDE / build directories
+#########################
+out/
+bin/
+
+#########################
+# Misc tooling
+#########################
+# Test output
+test-results/
+
+# Project resources folder (contains non-source assets)
+Project Resources/
+
+# Add more ignores for Docker, Python, or other tools as needed.
 node_modules

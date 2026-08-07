@@ -5,13 +5,15 @@ import leftDecorationImg from '../../assets/Signin/leftSidedecoration.png'
 
 const SIGN_IN_FIELDS = [
 {
-label: 'Username / Email',
-placeholder: 'Username / Email',
-type: 'email',
-autoComplete: 'email',
-icon: 'mail',
+key: 'username',
+label: 'Username',
+placeholder: 'Username',
+type: 'text',
+autoComplete: 'username',
+icon: 'user',
 },
 {
+key: 'password',
 label: 'Password',
 placeholder: 'Password',
 type: 'password',
@@ -22,27 +24,15 @@ icon: 'lock',
 
 const SIGN_UP_FIELDS = [
 {
-label: 'Full Name',
-placeholder: 'Full Name',
-type: 'text',
-autoComplete: 'name',
-icon: 'user',
-},
-{
+key: 'username',
 label: 'Username',
 placeholder: 'Username',
 type: 'text',
 autoComplete: 'username',
-icon: 'at',
+icon: 'user',
 },
 {
-label: 'Email Address',
-placeholder: 'Email Address',
-type: 'email',
-autoComplete: 'email',
-icon: 'mail',
-},
-{
+key: 'password',
 label: 'Create Password',
 placeholder: 'Create Password',
 type: 'password',
@@ -51,23 +41,25 @@ icon: 'lock',
 },
 ]
 
-function AuthField({ label, placeholder, type, autoComplete, icon }) {
+function AuthField({ label, placeholder, type, autoComplete, icon, value, onChange }) {
 return (
 <label className="block">
 <span className="mb-2 block text-sm font-medium text-slate-700">
 {label}
 </span>
 
-  <div className="flex h-12 items-center gap-3 rounded-xl border border-slate-200 bg-slate-50 px-4 transition focus-within:border-blue-500 focus-within:bg-white">
-    <FieldIcon kind={icon} />
+<div className="flex h-12 items-center gap-3 rounded-xl border border-slate-200 bg-slate-50 px-4 transition focus-within:border-blue-500 focus-within:bg-white">
+<FieldIcon kind={icon} />
 
-    <input
-      type={type}
-      autoComplete={autoComplete}
-      placeholder={placeholder}
-      className="w-full bg-transparent text-slate-900 outline-none placeholder:text-slate-400"
-    />
-  </div>
+<input
+type={type}
+autoComplete={autoComplete}
+placeholder={placeholder}
+value={value}
+onChange={onChange}
+className="w-full bg-transparent text-slate-900 outline-none placeholder:text-slate-400"
+/>
+</div>
 </label>
 
 )
@@ -110,11 +102,96 @@ return (
 )
 }
 
+const AUTH_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? ''
+
 export default function AuthPage({ onLogin }) {
 const [mode, setMode] = useState('sign-in')
+const [formValues, setFormValues] = useState({ username: '', password: '' })
+const [statusMessage, setStatusMessage] = useState('')
+const [statusType, setStatusType] = useState('')
+const [isSubmitting, setIsSubmitting] = useState(false)
 
 const isSignUp = mode === 'sign-up'
 const fields = isSignUp ? SIGN_UP_FIELDS : SIGN_IN_FIELDS
+
+function updateField(field, value) {
+setFormValues((currentValues) => ({
+...currentValues,
+[field]: value,
+}))
+}
+
+async function handleSubmit(event) {
+event.preventDefault()
+
+const username = formValues.username.trim()
+const password = formValues.password
+
+if (!username || !password) {
+setStatusType('error')
+setStatusMessage('Not valid')
+return
+}
+
+setIsSubmitting(true)
+setStatusMessage('')
+
+try {
+const endpoint = `${AUTH_BASE_URL}/api/auth/${isSignUp ? 'register' : 'login'}`
+const response = await fetch(endpoint, {
+method: 'POST',
+headers: {
+'Content-Type': 'application/json',
+},
+body: JSON.stringify({ username, password }),
+})
+
+const responseBody = await response.json().catch(() => null)
+
+if (!response.ok) {
+const message = responseBody?.message || responseBody?.detail || 'Not valid'
+setStatusType('error')
+setStatusMessage(message === 'Invalid username or password' ? 'Not valid' : message)
+return
+}
+
+if (isSignUp) {
+setStatusType('success')
+setStatusMessage('Account created. Please sign in.')
+setMode('sign-in')
+setFormValues({ username, password: '' })
+return
+}
+
+if (responseBody?.token) {
+localStorage.setItem('codesprintToken', responseBody.token)
+}
+
+if (responseBody?.username) {
+localStorage.setItem('codesprintUsername', responseBody.username)
+}
+
+if (responseBody?.userId) {
+localStorage.setItem('codesprintUserId', String(responseBody.userId))
+}
+
+setStatusType('success')
+setStatusMessage(responseBody?.message || 'Login successful')
+onLogin?.(responseBody)
+} catch {
+setStatusType('error')
+setStatusMessage('Not valid')
+} finally {
+setIsSubmitting(false)
+}
+}
+
+const statusClasses =
+statusType === 'error'
+? 'border-red-200 bg-red-50 text-red-700'
+: statusType === 'success'
+? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+: 'border-slate-200 bg-slate-50 text-slate-600'
 
 return (
 <main className="min-h-screen w-full bg-gradient-to-br from-blue-50 to-white">
@@ -124,82 +201,100 @@ return (
 <div className="w-full max-w-md">
 <img src={logoImg} alt="CodeSprint" className="mx-auto mb-8 w-56 sm:w-64 lg:w-72" />
 
-        <div className="mb-8 grid grid-cols-2 rounded-xl bg-slate-100 p-1">
-          <button
-            type="button"
-            onClick={() => setMode('sign-in')}
-            className={`rounded-lg py-3 text-sm font-semibold transition ${
-              !isSignUp
-                ? 'bg-white text-blue-700 shadow'
-                : 'text-slate-600 hover:text-slate-900'
-            }`}
-          >
-            Sign In
-          </button>
+<div className="mb-8 grid grid-cols-2 rounded-xl bg-slate-100 p-1">
+<button
+type="button"
+onClick={() => {
+setMode('sign-in')
+setStatusMessage('')
+setStatusType('')
+}}
+className={`rounded-lg py-3 text-sm font-semibold transition ${
+!isSignUp
+? 'bg-white text-blue-700 shadow'
+: 'text-slate-600 hover:text-slate-900'
+}`}
+>
+Sign In
+</button>
 
-          <button
-            type="button"
-            onClick={() => setMode('sign-up')}
-            className={`rounded-lg py-3 text-sm font-semibold transition ${
-              isSignUp
-                ? 'bg-white text-blue-700 shadow'
-                : 'text-slate-600 hover:text-slate-900'
-            }`}
-          >
-            Sign Up
-          </button>
-        </div>
+<button
+type="button"
+onClick={() => {
+setMode('sign-up')
+setStatusMessage('')
+setStatusType('')
+}}
+className={`rounded-lg py-3 text-sm font-semibold transition ${
+isSignUp
+? 'bg-white text-blue-700 shadow'
+: 'text-slate-600 hover:text-slate-900'
+}`}
+>
+Sign Up
+</button>
+</div>
 
-        <div className="space-y-5">
-          {fields.map((field) => (
-            <AuthField key={field.label} {...field} />
-          ))}
+<form className="space-y-5" onSubmit={handleSubmit}>
+{fields.map((field) => (
+<AuthField
+key={field.key}
+label={field.label}
+placeholder={field.placeholder}
+type={field.type}
+autoComplete={field.autoComplete}
+icon={field.icon}
+value={formValues[field.key]}
+onChange={(event) => updateField(field.key, event.target.value)}
+/>
+))}
 
-          {!isSignUp && (
-            <div className="flex items-center justify-between gap-4 text-sm">
-              <label className="flex items-center gap-2 text-slate-600">
-                <input
-                  type="checkbox"
-                  className="h-4 w-4 rounded border-slate-300 text-blue-600"
-                />
-                Remember Me
-              </label>
+{!isSignUp && (
+<div className="flex items-center justify-between gap-4 text-sm">
+<label className="flex items-center gap-2 text-slate-600">
+<input
+type="checkbox"
+className="h-4 w-4 rounded border-slate-300 text-blue-600"
+/>
+Remember Me
+</label>
 
-              <button
-                type="button"
-                className="font-medium text-blue-600 hover:text-blue-700"
-              >
-                Forgot Password?
-              </button>
-            </div>
-          )}
+<button type="button" className="font-medium text-blue-600 hover:text-blue-700">
+Forgot Password?
+</button>
+</div>
+)}
 
-          <button
-            type="button"
-            onClick={onLogin}
-            className="h-12 w-full rounded-xl bg-gradient-to-r from-sky-500 to-blue-700 text-base font-semibold text-white shadow-lg transition hover:scale-[1.01]"
-          >
-            {isSignUp ? 'Create Account' : 'Log In'}
-          </button>
+{statusMessage && (
+<div className={`rounded-xl border px-4 py-3 text-sm ${statusClasses}`}>
+{statusMessage}
+</div>
+)}
 
-          {!isSignUp && (
-            <p className="text-center text-sm text-slate-500">
-              Or login with
-            </p>
-          )}
+<button
+type="submit"
+disabled={isSubmitting}
+className="h-12 w-full rounded-xl bg-gradient-to-r from-sky-500 to-blue-700 text-base font-semibold text-white shadow-lg transition hover:scale-[1.01] disabled:cursor-not-allowed disabled:opacity-70 disabled:hover:scale-100"
+>
+{isSubmitting ? 'Please wait...' : isSignUp ? 'Create Account' : 'Log In'}
+</button>
 
-          <p className="text-center text-sm text-slate-500">
-            {isSignUp ? 'Already have an account?' : "Don't have an account?"}{' '}
-            <button
-              type="button"
-              onClick={() => setMode(isSignUp ? 'sign-in' : 'sign-up')}
-              className="font-semibold text-blue-600 hover:text-blue-700"
-            >
-              {isSignUp ? 'Sign In' : 'Sign Up'}
-            </button>
-          </p>
-        </div>
-      </div>
+{!isSignUp && (
+<p className="text-center text-sm text-slate-500">Or login with</p>
+)}
+
+<p className="text-center text-sm text-slate-500">
+{isSignUp ? 'Already have an account?' : "Don't have an account?"}{' '}
+<button
+type="button"
+onClick={() => setMode(isSignUp ? 'sign-in' : 'sign-up')}
+className="font-semibold text-blue-600 hover:text-blue-700"
+>
+{isSignUp ? 'Sign In' : 'Sign Up'}
+</button>
+</p>
+</form>
+</div>
     </section>
 
     {/* RIGHT SIDE - IMAGE (hidden on mobile/tablet) */}
