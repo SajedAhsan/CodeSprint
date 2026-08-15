@@ -11,6 +11,73 @@ const problemTopics = [
   'Mathematics', 'String Algorithms', 'Geometry',
 ]
 
+const getLoggedInUserId = () => {
+  const localUserId = Number(localStorage.getItem('codesprintUserId'))
+  if (Number.isFinite(localUserId) && localUserId > 0) {
+    return localUserId
+  }
+
+  const token = localStorage.getItem('codesprintToken')
+  if (!token) return null
+
+  try {
+    const tokenPayload = token.split('.')[1] || ''
+    const normalized = tokenPayload.replace(/-/g, '+').replace(/_/g, '/')
+    const padded = normalized + '='.repeat((4 - (normalized.length % 4)) % 4)
+    const payload = JSON.parse(atob(padded))
+    const decodedUserId = Number(payload.userId ?? payload.user_id)
+    return Number.isFinite(decodedUserId) && decodedUserId > 0 ? decodedUserId : null
+  } catch {
+    return null
+  }
+}
+
+const persistProblemState = async (problemId, statePatch) => {
+  const userId = getLoggedInUserId()
+  const token = localStorage.getItem('codesprintToken')
+  if (!userId || !problemId) {
+    console.warn('Problem state not persisted: missing valid userId or problemId')
+    return
+  }
+
+  if (!token) {
+    console.warn('Problem state not persisted: missing auth token')
+    return
+  }
+
+  try {
+    const payload = {
+      note: typeof statePatch?.note === 'string'
+        ? statePatch.note
+        : typeof statePatch?.notes === 'string'
+          ? statePatch.notes
+          : '',
+      bookmark: typeof statePatch?.bookmark === 'boolean'
+        ? statePatch.bookmark
+        : Boolean(statePatch?.bookmarked),
+      solved: typeof statePatch?.solved === 'boolean'
+        ? statePatch.solved
+        : Boolean(statePatch?.solved),
+    }
+
+    const response = await fetch(`/api/user-problems/${userId}/${problemId}`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        Accept: 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify(payload),
+    })
+
+    if (!response.ok) {
+      throw new Error(`Failed to save problem state: ${response.status}`)
+    }
+  } catch (error) {
+    console.error('Error saving problem state:', error)
+  }
+}
+
 /* ─── Helper to build default solution + discussion for any problem ─── */
 function buildMeta(name, concept, judgeUrl) {
   return {
@@ -272,45 +339,71 @@ export default function ProblemsPage({
     const loadProblems = async () => {
       try {
         setLoadingProblems(true)
-        const endpoint = '/api/problems'
+
+        const userId = getLoggedInUserId()
+        const endpoint = userId ? `/api/problems/page/${userId}` : '/api/problems'
         const response = await fetch(endpoint, { headers: { Accept: 'application/json' } })
         if (!response.ok) throw new Error('Unable to load problems')
 
         const payload = await response.json()
         const grouped = {}
 
-        payload.forEach((problem) => {
-          const topicName = problem.topic || 'Basic Problems'
-          if (!grouped[topicName]) grouped[topicName] = []
+        if (userId && Array.isArray(payload?.topics)) {
+          payload.topics.forEach((topic) => {
+            const topicName = topic.topicName || 'Basic Problems'
+            if (!grouped[topicName]) grouped[topicName] = []
 
-          // transform editorial response to UI shape
-          let solution = null
-          if (problem.solution) {
-            const codes = {}
-            if (Array.isArray(problem.solution.solutions)) {
-              problem.solution.solutions.forEach((s) => {
-                if (s.language) codes[s.language] = s.code || ''
+            topic.problems.forEach((problem) => {
+              grouped[topicName].push({
+                id: problem.problemId,
+                name: problem.title,
+                difficulty: problem.difficulty || 'Medium',
+                solved: Boolean(problem.userState?.solved),
+                bookmarked: Boolean(problem.userState?.bookmark),
+                notes: problem.userState?.note || '',
+                concept: problem.description || '',
+                judgeUrl: 'https://codeforces.com/problemset',
+                solution: {
+                  explanation: problem.description || 'No description provided yet.',
+                  codes: {},
+                  video: null,
+                },
               })
-            }
-            solution = {
-              explanation: problem.solution.explanation || '',
-              codes: Object.keys(codes).length ? codes : (problem.solution.code ? { [problem.solution.language || 'Code']: problem.solution.code } : {}),
-              video: problem.solution.videoLink || problem.solution.video || null,
-            }
-          }
-
-          grouped[topicName].push({
-            id: problem.problemId,
-            name: problem.title,
-            difficulty: problem.difficulty || 'Medium',
-            solved: false,
-            bookmarked: false,
-            notes: '',
-            concept: problem.concept || '',
-            judgeUrl: problem.externalLink || 'https://codeforces.com/problemset',
-            solution,
+            })
           })
-        })
+        } else {
+          payload.forEach((problem) => {
+            const topicName = problem.topic || 'Basic Problems'
+            if (!grouped[topicName]) grouped[topicName] = []
+
+            let solution = null
+            if (problem.solution) {
+              const codes = {}
+              if (Array.isArray(problem.solution.solutions)) {
+                problem.solution.solutions.forEach((s) => {
+                  if (s.language) codes[s.language] = s.code || ''
+                })
+              }
+              solution = {
+                explanation: problem.solution.explanation || '',
+                codes: Object.keys(codes).length ? codes : (problem.solution.code ? { [problem.solution.language || 'Code']: problem.solution.code } : {}),
+                video: problem.solution.videoLink || problem.solution.video || null,
+              }
+            }
+
+            grouped[topicName].push({
+              id: problem.problemId,
+              name: problem.title,
+              difficulty: problem.difficulty || 'Medium',
+              solved: false,
+              bookmarked: false,
+              notes: '',
+              concept: problem.concept || '',
+              judgeUrl: problem.externalLink || 'https://codeforces.com/problemset',
+              solution,
+            })
+          })
+        }
 
         const nextTopics = Object.keys(grouped).filter((topic) => grouped[topic].length > 0)
         const nextProblemsByTopic = {
@@ -320,7 +413,8 @@ export default function ProblemsPage({
 
         setTopics(nextTopics.length > 0 ? nextTopics : problemTopics)
         setProblemsByTopic(nextProblemsByTopic)
-        if (!nextTopics.includes(selectedTopic) && nextTopics.length > 0) {
+
+        if (nextTopics.length > 0 && !nextTopics.includes(selectedTopic)) {
           setSelectedTopic(nextTopics[0])
         }
       } catch (error) {
@@ -334,14 +428,38 @@ export default function ProblemsPage({
   }, [])
 
   /* ── Topic-level helpers ── */
-  const updateRow = (id, patch) =>
+  const updateRow = (id, patch) => {
+    const currentTopicProblems = problemsByTopic[selectedTopic] || []
+    const currentProblem = currentTopicProblems.find((p) => p.id === id)
+    if (!currentProblem) return
+
+    const nextProblem = { ...currentProblem, ...patch }
+    const nextState = {
+      note: typeof nextProblem.notes === 'string' ? nextProblem.notes : '',
+      bookmark: Boolean(nextProblem.bookmarked),
+      solved: Boolean(nextProblem.solved),
+    }
+
     setProblemsByTopic((prev) => ({
       ...prev,
-      [selectedTopic]: prev[selectedTopic].map((p) => (p.id === id ? { ...p, ...patch } : p)),
+      [selectedTopic]: (prev[selectedTopic] || []).map((p) => (p.id === id ? nextProblem : p)),
     }))
 
-  const toggleStatus = (id) => updateRow(id, { solved: !problemsByTopic[selectedTopic].find((p) => p.id === id).solved })
-  const toggleBookmark = (id) => updateRow(id, { bookmarked: !problemsByTopic[selectedTopic].find((p) => p.id === id).bookmarked })
+    void persistProblemState(id, nextState)
+  }
+
+  const toggleStatus = (id) => {
+    const currentProblem = problemsByTopic[selectedTopic]?.find((p) => p.id === id)
+    if (!currentProblem) return
+    updateRow(id, { solved: !currentProblem.solved })
+  }
+
+  const toggleBookmark = (id) => {
+    const currentProblem = problemsByTopic[selectedTopic]?.find((p) => p.id === id)
+    if (!currentProblem) return
+    updateRow(id, { bookmarked: !currentProblem.bookmarked })
+  }
+
   const updateNotes = (id, notes) => updateRow(id, { notes })
 
   /* ── Navigation to ProblemPage ── */
