@@ -8,6 +8,9 @@ import org.springframework.data.repository.query.Param;
 
 public interface EditorialSolutionRepository extends JpaRepository<EditorialSolution, Integer> {
 
-    @Query(value = "SELECT * FROM editorial_solutions WHERE editorial_id = :editorialId", nativeQuery = true)
+    @Query("SELECT s FROM EditorialSolution s WHERE s.editorial.editorialId = :editorialId")
     List<EditorialSolution> findByEditorialId(@Param("editorialId") Integer editorialId);
+
+    @Query("SELECT s FROM EditorialSolution s WHERE s.editorial.editorialId = :editorialId AND LOWER(s.language) = LOWER(:language)")
+    List<EditorialSolution> findByEditorialIdAndLanguage(@Param("editorialId") Integer editorialId, @Param("language") String language);
 }

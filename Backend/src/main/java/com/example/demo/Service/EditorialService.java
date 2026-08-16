@@ -42,13 +42,19 @@ public class EditorialService {
         resp.setExplanation(editorial.getExplanation());
         resp.setVideoLink(editorial.getVideoLink());
 
-        List<EditorialResponse.SolutionItem> solutions = editorial.getSolutions().stream().map(s -> {
-            EditorialResponse.SolutionItem it = new EditorialResponse.SolutionItem();
-            it.setSolutionId(s.getSolutionId());
-            it.setLanguage(s.getLanguage());
-            it.setCode(s.getCode());
-            return it;
-        }).collect(Collectors.toList());
+        List<EditorialSolution> solutionEntities = editorialSolutionRepository.findByEditorialId(editorial.getEditorialId());
+        if (solutionEntities == null || solutionEntities.isEmpty()) {
+            solutionEntities = editorial.getSolutions();
+        }
+
+        List<EditorialResponse.SolutionItem> solutions = (solutionEntities != null ? solutionEntities : java.util.Collections.<EditorialSolution>emptyList())
+                .stream().map(s -> {
+                    EditorialResponse.SolutionItem it = new EditorialResponse.SolutionItem();
+                    it.setSolutionId(s.getSolutionId());
+                    it.setLanguage(s.getLanguage());
+                    it.setCode(s.getCode());
+                    return it;
+                }).collect(Collectors.toList());
 
         resp.setSolutions(solutions);
         return resp;
@@ -59,39 +65,37 @@ public class EditorialService {
         Problem problem = problemRepository.findProblemById(problemId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Problem not found"));
 
-        Editorial editorial = editorialRepository.findByProblemId(problemId).orElseGet(() -> {
-            Editorial e = new Editorial();
-            e.setProblem(problem);
-            e.setExplanation("");
-            return editorialRepository.saveAndFlush(e);
-        });
-
-        // update editorial explanation/video if provided
-        if (request.getExplanation() != null && !request.getExplanation().isBlank()) {
-            editorial.setExplanation(request.getExplanation());
+        Editorial editorial = editorialRepository.findByProblemId(problemId).orElse(null);
+        if (editorial == null) {
+            editorial = new Editorial();
+            editorial.setProblem(problem);
+            editorial.setExplanation(request.getExplanation() != null ? request.getExplanation().trim() : "");
+            editorial.setVideoLink(request.getVideoLink() != null && !request.getVideoLink().isBlank() ? request.getVideoLink().trim() : null);
+            editorial = editorialRepository.saveAndFlush(editorial);
+        } else {
+            if (request.getExplanation() != null && !request.getExplanation().isBlank()) {
+                editorial.setExplanation(request.getExplanation().trim());
+            }
+            if (request.getVideoLink() != null && !request.getVideoLink().isBlank()) {
+                editorial.setVideoLink(request.getVideoLink().trim());
+            }
+            editorial = editorialRepository.saveAndFlush(editorial);
         }
-        if (request.getVideoLink() != null && !request.getVideoLink().isBlank()) {
-            editorial.setVideoLink(request.getVideoLink());
-        }
-        editorial = editorialRepository.saveAndFlush(editorial);
 
         String reqLanguage = request.getLanguage() == null ? "" : request.getLanguage().trim();
-        EditorialSolution existingSolution = editorial.getSolutions().stream()
-                .filter(s -> s.getLanguage().equalsIgnoreCase(reqLanguage))
-                .findFirst()
-                .orElse(null);
-
-        if (existingSolution != null) {
-            existingSolution.setCode(request.getCode() == null ? "" : request.getCode());
-            editorialSolutionRepository.save(existingSolution);
-        } else {
-            EditorialSolution solution = new EditorialSolution();
-            solution.setEditorial(editorial);
-            solution.setLanguage(reqLanguage);
-            solution.setCode(request.getCode() == null ? "" : request.getCode());
-
-            editorial.getSolutions().add(solution);
-            editorialSolutionRepository.save(solution);
+        if (!reqLanguage.isBlank()) {
+            List<EditorialSolution> existingSolutions = editorialSolutionRepository.findByEditorialIdAndLanguage(editorial.getEditorialId(), reqLanguage);
+            EditorialSolution solution;
+            if (existingSolutions != null && !existingSolutions.isEmpty()) {
+                solution = existingSolutions.get(0);
+                solution.setCode(request.getCode() == null ? "" : request.getCode());
+            } else {
+                solution = new EditorialSolution();
+                solution.setEditorial(editorial);
+                solution.setLanguage(reqLanguage);
+                solution.setCode(request.getCode() == null ? "" : request.getCode());
+            }
+            editorialSolutionRepository.saveAndFlush(solution);
         }
 
         return getEditorialByProblemId(problemId);

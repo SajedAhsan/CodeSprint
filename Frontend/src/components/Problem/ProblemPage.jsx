@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 
 const TABS = ['Discussion', 'Solution']
 
@@ -8,15 +8,32 @@ function cn(...classes) {
 
 function getEmbedUrl(url) {
   if (!url) return ''
-  // If it's already an embed URL or not a youtube URL, return as-is
-  if (url.includes('youtube.com/embed/')) return url
-  // Match standard youtube and youtu.be links
+  const trimmed = url.trim()
+  if (trimmed.includes('youtube.com/embed/')) return trimmed
+
+  // youtu.be/<id>
+  const shortMatch = trimmed.match(/youtu\.be\/([a-zA-Z0-9_-]{11})/)
+  if (shortMatch) return `https://www.youtube.com/embed/${shortMatch[1]}`
+
+  // youtube.com/watch?v=<id>
+  const watchMatch = trimmed.match(/[?&]v=([a-zA-Z0-9_-]{11})/)
+  if (watchMatch) return `https://www.youtube.com/embed/${watchMatch[1]}`
+
+  // youtube.com/shorts/<id>
+  const shortsMatch = trimmed.match(/youtube\.com\/shorts\/([a-zA-Z0-9_-]{11})/)
+  if (shortsMatch) return `https://www.youtube.com/embed/${shortsMatch[1]}`
+
+  // youtube.com/live/<id>
+  const liveMatch = trimmed.match(/youtube\.com\/live\/([a-zA-Z0-9_-]{11})/)
+  if (liveMatch) return `https://www.youtube.com/embed/${liveMatch[1]}`
+
+  // standard fallback regex
   const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|&v=)([^#&?]*).*/
-  const match = url.match(regExp)
-  if (match && match[2].length === 11) {
+  const match = trimmed.match(regExp)
+  if (match && match[2] && match[2].length === 11) {
     return `https://www.youtube.com/embed/${match[2]}`
   }
-  return url
+  return trimmed
 }
 
 function TabButton({ active, children, onClick }) {
@@ -154,6 +171,20 @@ function DiscussionThread({ item, depth = 0, onLike, onReply, replyTargetId, set
   )
 }
 
+function getCodeForLanguage(codes, lang) {
+  if (!codes || typeof codes !== 'object') return ''
+  if (codes[lang]) return codes[lang]
+  const target = (lang || '').toLowerCase()
+  for (const [key, value] of Object.entries(codes)) {
+    const k = (key || '').toLowerCase()
+    if (k === target) return value
+    if ((target.includes('c++') || target.includes('cpp')) && (k.includes('c++') || k.includes('cpp'))) return value
+    if (target.includes('java') && k.includes('java') && !k.includes('script')) return value
+    if (target.includes('python') && (k.includes('python') || k.includes('py'))) return value
+  }
+  return ''
+}
+
 export default function ProblemPage({ onBack, initialTab = 'Discussion', problem, onUpdateProblem }) {
   // Normalise tab — old tabs that no longer exist fall back to Discussion
   const resolvedTab = TABS.includes(initialTab) ? initialTab : 'Discussion'
@@ -164,6 +195,65 @@ export default function ProblemPage({ onBack, initialTab = 'Discussion', problem
   const [replyText, setReplyText] = useState('')
   const [codeLang, setCodeLang] = useState('C++')
   const [solutionTab, setSolutionTab] = useState('Code')
+
+  const [editorialData, setEditorialData] = useState(problem.solution || null)
+  const [isLoadingEditorial, setIsLoadingEditorial] = useState(false)
+
+  const problemId = problem?.id ?? problem?.problemId
+
+  useEffect(() => {
+    if (!problemId) return
+    let isMounted = true
+    const fetchEditorial = async () => {
+      try {
+        setIsLoadingEditorial(true)
+        const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? ''
+        const endpoint = API_BASE_URL ? `${API_BASE_URL}/api/editorials/problem/${problemId}` : `/api/editorials/problem/${problemId}`
+        const token = localStorage.getItem('codesprintToken') || localStorage.getItem('token')
+        const headers = {
+          Accept: 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        }
+        const res = await fetch(endpoint, { headers })
+        if (!res.ok) {
+          setIsLoadingEditorial(false)
+          return
+        }
+        const data = await res.json()
+        if (data && isMounted) {
+          const codes = {}
+          if (Array.isArray(data.solutions)) {
+            data.solutions.forEach((s) => {
+              if (s.language) {
+                codes[s.language] = s.code || ''
+              }
+            })
+          }
+          const updated = {
+            explanation: data.explanation || problem.solution?.explanation || '',
+            codes: Object.keys(codes).length
+              ? codes
+              : (problem.solution?.codes || (problem.solution?.code ? { [problem.solution.language || 'Code']: problem.solution.code } : {})),
+            video: data.videoLink || data.video || problem.solution?.video || problem.solution?.videoLink || null,
+          }
+          setEditorialData(updated)
+          if (onUpdateProblem) {
+            onUpdateProblem({ ...problem, solution: updated })
+          }
+        }
+      } catch (err) {
+        console.error('Error fetching editorial for problem:', err)
+      } finally {
+        if (isMounted) setIsLoadingEditorial(false)
+      }
+    }
+    fetchEditorial()
+    return () => {
+      isMounted = false
+    }
+  }, [problemId])
+
+  const solution = editorialData || problem.solution
 
   /* ── handlers ── */
   const handlePostComment = (e) => {
@@ -349,7 +439,12 @@ export default function ProblemPage({ onBack, initialTab = 'Discussion', problem
           {/* ── Solution Tab ── */}
           {activeTab === 'Solution' && (
             <div className="space-y-6">
-              {problem.solution ? (
+              {isLoadingEditorial ? (
+                <div className="flex flex-col items-center justify-center py-20 text-center">
+                  <div className="h-10 w-10 animate-spin rounded-full border-4 border-blue-600 border-t-transparent mb-3" />
+                  <p className="text-sm font-medium text-slate-500">Loading solution & video tutorial...</p>
+                </div>
+              ) : solution ? (
                 <article className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
                   {/* Solution Sub-tabs */}
                   <div className="border-b border-slate-200 px-5 py-3.5 bg-slate-50/50">
@@ -357,16 +452,17 @@ export default function ProblemPage({ onBack, initialTab = 'Discussion', problem
                       <TabButton active={solutionTab === 'Code'} onClick={() => setSolutionTab('Code')}>
                         Code Solution
                       </TabButton>
-                      {problem.solution.explanation && (
-                        <TabButton active={solutionTab === 'Explanation'} onClick={() => setSolutionTab('Explanation')}>
-                          Explanation
-                        </TabButton>
-                      )}
-                      {problem.solution.video && (
-                        <TabButton active={solutionTab === 'Video'} onClick={() => setSolutionTab('Video')}>
-                          Video Walkthrough
-                        </TabButton>
-                      )}
+                      <TabButton active={solutionTab === 'Explanation'} onClick={() => setSolutionTab('Explanation')}>
+                        Explanation
+                      </TabButton>
+                      <TabButton active={solutionTab === 'Video'} onClick={() => setSolutionTab('Video')}>
+                        <span className="flex items-center gap-1.5">
+                          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+                            <path d="M19.615 3.184c-3.604-.246-11.631-.245-15.23 0-3.897.266-4.356 2.62-4.385 8.816.029 6.185.484 8.549 4.385 8.816 3.6.245 11.626.246 15.23 0 3.897-.266 4.356-2.62 4.385-8.816-.029-6.185-.484-8.549-4.385-8.816zm-10.615 12.816v-8l8 3.993-8 4.007z"/>
+                          </svg>
+                          Video Tutorial
+                        </span>
+                      </TabButton>
                     </div>
                   </div>
 
@@ -395,32 +491,81 @@ export default function ProblemPage({ onBack, initialTab = 'Discussion', problem
                             </div>
                           </div>
                           <pre className="overflow-x-auto px-5 py-5 text-sm leading-relaxed text-slate-100 font-mono">
-                            <code>{problem.solution.codes?.[codeLang] || problem.solution.code || 'No code provided for this language.'}</code>
+                            <code>{getCodeForLanguage(solution.codes, codeLang) || solution.code || 'No code provided for this language.'}</code>
                           </pre>
                         </div>
                       </div>
                     )}
 
-                    {solutionTab === 'Explanation' && problem.solution.explanation && (
+                    {solutionTab === 'Explanation' && (
                       <div className="animate-in fade-in slide-in-from-bottom-2 duration-300">
                         <p className="text-xs font-bold uppercase tracking-[0.22em] text-blue-700 mb-4">
                           Editorial Walkthrough
                         </p>
-                        <div className="prose prose-slate max-w-none text-sm leading-loose text-slate-700 whitespace-pre-wrap">
-                          {problem.solution.explanation}
-                        </div>
+                        {solution.explanation ? (
+                          <div className="prose prose-slate max-w-none text-sm leading-loose text-slate-700 whitespace-pre-wrap">
+                            {solution.explanation}
+                          </div>
+                        ) : (
+                          <p className="text-sm text-slate-500 italic">No explanation provided yet.</p>
+                        )}
                       </div>
                     )}
 
-                    {solutionTab === 'Video' && problem.solution.video && (
-                      <div className="animate-in fade-in zoom-in-95 duration-300 max-w-4xl mx-auto flex flex-col items-center justify-center">
-                        <iframe
-                          title="Solution Video"
-                          src={getEmbedUrl(problem.solution.video)}
-                          className="aspect-video w-full rounded-2xl border border-slate-200 shadow-xl"
-                          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                          allowFullScreen
-                        />
+                    {solutionTab === 'Video' && (
+                      <div className="animate-in fade-in zoom-in-95 duration-300 max-w-4xl mx-auto flex flex-col">
+                        {solution.video ? (
+                          <div className="w-full space-y-4">
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-2">
+                                <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-red-50 text-red-600 border border-red-100 shadow-sm">
+                                  <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+                                    <path d="M19.615 3.184c-3.604-.246-11.631-.245-15.23 0-3.897.266-4.356 2.62-4.385 8.816.029 6.185.484 8.549 4.385 8.816 3.6.245 11.626.246 15.23 0 3.897-.266 4.356-2.62 4.385-8.816-.029-6.185-.484-8.549-4.385-8.816zm-10.615 12.816v-8l8 3.993-8 4.007z"/>
+                                  </svg>
+                                </span>
+                                <div>
+                                  <h3 className="text-sm font-bold text-slate-900 leading-none">YouTube Video Tutorial</h3>
+                                  <p className="text-[11px] text-slate-400 mt-1">Watch step-by-step problem walkthrough & explanation</p>
+                                </div>
+                              </div>
+                              <a
+                                href={solution.video}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="inline-flex items-center gap-1.5 rounded-full bg-slate-100 hover:bg-slate-200 px-3.5 py-1.5 text-xs font-semibold text-slate-700 transition-colors shadow-sm"
+                              >
+                                Watch on YouTube
+                                <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                                  <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
+                                  <polyline points="15 3 21 3 21 9" />
+                                  <line x1="10" y1="14" x2="21" y2="3" />
+                                </svg>
+                              </a>
+                            </div>
+
+                            <div className="relative aspect-video w-full overflow-hidden rounded-2xl border border-slate-200 bg-slate-950 shadow-xl">
+                              <iframe
+                                title="Solution Video Tutorial"
+                                src={getEmbedUrl(solution.video)}
+                                className="h-full w-full border-0"
+                                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                                allowFullScreen
+                              />
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="flex flex-col items-center py-16 text-center">
+                            <div className="w-14 h-14 rounded-2xl bg-red-50 text-red-500 flex items-center justify-center mb-3 shadow-sm border border-red-100">
+                              <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="currentColor">
+                                <path d="M19.615 3.184c-3.604-.246-11.631-.245-15.23 0-3.897.266-4.356 2.62-4.385 8.816.029 6.185.484 8.549 4.385 8.816 3.6.245 11.626.246 15.23 0 3.897-.266 4.356-2.62 4.385-8.816-.029-6.185-.484-8.549-4.385-8.816zm-10.615 12.816v-8l8 3.993-8 4.007z"/>
+                              </svg>
+                            </div>
+                            <p className="text-base font-semibold text-slate-800">No video tutorial available yet</p>
+                            <p className="text-xs text-slate-500 mt-1 max-w-sm">
+                              A video walkthrough for this problem has not been added to the database yet. Check out the Code Solution or Explanation tab!
+                            </p>
+                          </div>
+                        )}
                       </div>
                     )}
                   </div>

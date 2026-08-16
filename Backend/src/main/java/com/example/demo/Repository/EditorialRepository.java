@@ -8,6 +8,6 @@ import org.springframework.data.repository.query.Param;
 
 public interface EditorialRepository extends JpaRepository<Editorial, Integer> {
 
-    @Query(value = "SELECT * FROM editorials WHERE problem_id = :problemId", nativeQuery = true)
+    @Query("SELECT e FROM Editorial e WHERE e.problem.problemId = :problemId")
     Optional<Editorial> findByProblemId(@Param("problemId") Integer problemId);
 }

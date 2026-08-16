@@ -111,7 +111,8 @@ export default function ProblemRegistry({
 
     setIsSubmitting(true)
     try {
-      const endpoint = API_BASE_URL ? `${API_BASE_URL}/api/editorials/${modalProblem.id}/solutions` : `/api/editorials/${modalProblem.id}/solutions`
+      const targetId = modalProblem.id || modalProblem.problemId
+      const endpoint = API_BASE_URL ? `${API_BASE_URL}/api/editorials/${targetId}/solutions` : `/api/editorials/${targetId}/solutions`
       
       const draftsToSave = { ...codeByLanguage }
       draftsToSave[language] = currentCode // Ensure active editor is saved
