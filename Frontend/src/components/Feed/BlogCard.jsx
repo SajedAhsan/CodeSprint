@@ -1,254 +1,640 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useState, useEffect } from 'react'
 
-function ActionButton({ label, active = false, children, onClick }) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={[
-        'inline-flex items-center gap-2 rounded-full border px-4 py-2 text-sm font-medium transition',
-        active
-          ? 'border-blue-500 bg-blue-600 text-white shadow-sm'
-          : 'border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-100',
-      ].join(' ')}
-      aria-label={label}
-    >
-      {children}
-      <span>{label}</span>
-    </button>
-  )
+function getAuthHeaders() {
+  const token = localStorage.getItem('codesprintToken') || localStorage.getItem('token')
+  const headers = { 'Content-Type': 'application/json' }
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`
+  }
+  return headers
 }
 
-function VoteIcon({ direction }) {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" className="h-4 w-4" aria-hidden="true">
-      {direction === 'up' ? (
-        <path d="M12 5l6 7h-4v7H10v-7H6l6-7z" fill="currentColor" />
-      ) : (
-        <path d="M12 19l-6-7h4V5h4v7h4l-6 7z" fill="currentColor" />
-      )}
-    </svg>
-  )
+function formatBlogDate(dateStr) {
+  if (!dateStr) return 'Just now'
+  try {
+    const d = new Date(dateStr)
+    return d.toLocaleDateString(undefined, {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    })
+  } catch {
+    return dateStr
+  }
 }
 
-export default function BlogCard({ post }) {
-  const [voteCount, setVoteCount] = useState(post.votes)
-  const [activeVote, setActiveVote] = useState(null)
+export default function BlogCard({ post, onEditBlog, onDeleteBlog, onBlogUpdated }) {
+  const [likeCount, setLikeCount] = useState(post.likeCount ?? 0)
+  const [isLiked, setIsLiked] = useState(Boolean(post.isLikedByCurrentUser))
+  const [isLiking, setIsLiking] = useState(false)
+
   const [commentsOpen, setCommentsOpen] = useState(false)
+  const [comments, setComments] = useState([])
+  const [isLoadingComments, setIsLoadingComments] = useState(false)
   const [commentText, setCommentText] = useState('')
-  const [comments, setComments] = useState(
-    post.comments.map((comment) => ({
-      ...comment,
-      replies: comment.replies ?? [],
-    })),
-  )
-  const [activeReplyPath, setActiveReplyPath] = useState(null)
+  const [isSubmittingComment, setIsSubmittingComment] = useState(false)
+
+  const [activeReplyId, setActiveReplyId] = useState(null)
   const [replyText, setReplyText] = useState('')
+  const [isSubmittingReply, setIsSubmittingReply] = useState(false)
 
-  const commentCount = comments.length
+  const [editingCommentId, setEditingCommentId] = useState(null)
+  const [editCommentText, setEditCommentText] = useState('')
+  const [isSubmittingEdit, setIsSubmittingEdit] = useState(false)
 
-  const badgeLabel = useMemo(() => {
-    if (commentCount === 0) return 'No comments yet'
-    if (commentCount === 1) return '1 comment'
-    return `${commentCount} comments`
-  }, [commentCount])
+  const [isDeletingBlog, setIsDeletingBlog] = useState(false)
 
-  const handleVote = (direction) => {
-    setActiveVote((current) => {
-      const next = current === direction ? null : direction
+  const currentUsername = localStorage.getItem('codesprintUsername')
+  const currentUserId = localStorage.getItem('codesprintUserId')
 
-      setVoteCount((currentVotes) => {
-        if (current === direction) return currentVotes - 1
-        if (current === null) return currentVotes + 1
-        return direction === 'up' ? currentVotes + 2 : currentVotes - 2
+  const isAuthor =
+    (currentUsername && post.authorUsername && currentUsername.toLowerCase() === post.authorUsername.toLowerCase()) ||
+    (currentUserId && post.authorId && String(currentUserId) === String(post.authorId))
+
+  // Synchronize state when post prop updates
+  useEffect(() => {
+    setLikeCount(post.likeCount ?? 0)
+    setIsLiked(Boolean(post.isLikedByCurrentUser))
+  }, [post.likeCount, post.isLikedByCurrentUser])
+
+  const fetchComments = async () => {
+    if (!post.blogId) return
+    try {
+      setIsLoadingComments(true)
+      const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? ''
+      const endpoint = API_BASE_URL ? `${API_BASE_URL}/api/blogs/${post.blogId}/comments` : `/api/blogs/${post.blogId}/comments`
+      const res = await fetch(endpoint, {
+        headers: getAuthHeaders(),
+      })
+      if (res.ok) {
+        const data = await res.json()
+        setComments(Array.isArray(data) ? data : [])
+      }
+    } catch (err) {
+      console.error('Failed to fetch comments for blog', post.blogId, err)
+    } finally {
+      setIsLoadingComments(false)
+    }
+  }
+
+  const handleToggleComments = () => {
+    const nextState = !commentsOpen
+    setCommentsOpen(nextState)
+    if (nextState) {
+      fetchComments()
+    }
+  }
+
+  const handleLikeBlog = async () => {
+    const token = localStorage.getItem('codesprintToken') || localStorage.getItem('token')
+    if (!token) {
+      alert('Please log in to like this blog.')
+      return
+    }
+
+    if (isLiking) return
+    setIsLiking(true)
+
+    // Optimistic update
+    const previousLiked = isLiked
+    const previousCount = likeCount
+    const nextLiked = !isLiked
+    const nextCount = nextLiked ? previousCount + 1 : Math.max(0, previousCount - 1)
+
+    setIsLiked(nextLiked)
+    setLikeCount(nextCount)
+
+    try {
+      const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? ''
+      const endpoint = API_BASE_URL ? `${API_BASE_URL}/api/blogs/${post.blogId}/react` : `/api/blogs/${post.blogId}/react`
+      const res = await fetch(endpoint, {
+        method: 'POST',
+        headers: getAuthHeaders(),
       })
 
-      return next
-    })
-  }
-
-  const handleCommentSubmit = (event) => {
-    event.preventDefault()
-
-    const trimmedComment = commentText.trim()
-    if (!trimmedComment) return
-
-    setComments((currentComments) => [
-      ...currentComments,
-      { author: 'You', text: trimmedComment },
-    ])
-    setCommentText('')
-    setCommentsOpen(true)
-  }
-
-  const addReplyAtPath = (nodes, pathParts, reply) => {
-    if (pathParts.length === 0) return nodes
-
-    const [currentIndex, ...restPath] = pathParts
-
-    return nodes.map((node, index) => {
-      if (index !== currentIndex) return node
-
-      if (restPath.length === 0) {
-        return {
-          ...node,
-          replies: [...(node.replies ?? []), reply],
-        }
+      if (res.ok) {
+        const data = await res.json()
+        setIsLiked(Boolean(data.isLiked))
+        setLikeCount(data.likeCount ?? nextCount)
+        onBlogUpdated?.({ ...post, likeCount: data.likeCount, isLikedByCurrentUser: data.isLiked })
+      } else {
+        // Revert on failure
+        setIsLiked(previousLiked)
+        setLikeCount(previousCount)
+        const err = await res.json().catch(() => ({}))
+        alert(err.message || 'Failed to update reaction.')
       }
-
-      return {
-        ...node,
-        replies: addReplyAtPath(node.replies ?? [], restPath, reply),
-      }
-    })
+    } catch (err) {
+      console.error('Error toggling blog reaction:', err)
+      setIsLiked(previousLiked)
+      setLikeCount(previousCount)
+    } finally {
+      setIsLiking(false)
+    }
   }
 
-  const handleReplySubmit = (event, replyPath) => {
+  const handleCommentSubmit = async (event) => {
     event.preventDefault()
+    const trimmed = commentText.trim()
+    if (!trimmed) return
 
-    const trimmedReply = replyText.trim()
-    if (!trimmedReply) return
+    const token = localStorage.getItem('codesprintToken') || localStorage.getItem('token')
+    if (!token) {
+      alert('Please log in to comment.')
+      return
+    }
 
-    const pathParts = replyPath.split('-').map(Number)
+    try {
+      setIsSubmittingComment(true)
+      const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? ''
+      const endpoint = API_BASE_URL ? `${API_BASE_URL}/api/blogs/${post.blogId}/comments` : `/api/blogs/${post.blogId}/comments`
+      const res = await fetch(endpoint, {
+        method: 'POST',
+        headers: getAuthHeaders(),
+        body: JSON.stringify({ content: trimmed }),
+      })
 
-    setComments((currentComments) =>
-      addReplyAtPath(currentComments, pathParts, {
-        author: 'You',
-        text: trimmedReply,
-        replies: [],
-      }),
-    )
-
-    setReplyText('')
-    setActiveReplyPath(null)
-    setCommentsOpen(true)
+      if (res.ok) {
+        setCommentText('')
+        await fetchComments()
+        onBlogUpdated?.({ ...post, commentCount: (post.commentCount || 0) + 1 })
+      } else {
+        const err = await res.json().catch(() => ({}))
+        alert(err.message || 'Failed to post comment.')
+      }
+    } catch (err) {
+      console.error('Error posting comment:', err)
+      alert('Network error while posting comment.')
+    } finally {
+      setIsSubmittingComment(false)
+    }
   }
 
-  const renderCommentThread = (comment, path, depth = 0) => {
-    const pathKey = path.join('-')
+  const handleReplySubmit = async (event, parentCommentId) => {
+    event.preventDefault()
+    const trimmed = replyText.trim()
+    if (!trimmed) return
+
+    const token = localStorage.getItem('codesprintToken') || localStorage.getItem('token')
+    if (!token) {
+      alert('Please log in to reply.')
+      return
+    }
+
+    try {
+      setIsSubmittingReply(true)
+      const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? ''
+      const endpoint = API_BASE_URL ? `${API_BASE_URL}/api/blogs/${post.blogId}/comments` : `/api/blogs/${post.blogId}/comments`
+      const res = await fetch(endpoint, {
+        method: 'POST',
+        headers: getAuthHeaders(),
+        body: JSON.stringify({ content: trimmed, parentCommentId }),
+      })
+
+      if (res.ok) {
+        setReplyText('')
+        setActiveReplyId(null)
+        await fetchComments()
+        onBlogUpdated?.({ ...post, commentCount: (post.commentCount || 0) + 1 })
+      } else {
+        const err = await res.json().catch(() => ({}))
+        alert(err.message || 'Failed to post reply.')
+      }
+    } catch (err) {
+      console.error('Error posting reply:', err)
+    } finally {
+      setIsSubmittingReply(false)
+    }
+  }
+
+  const handleUpdateComment = async (event, commentId) => {
+    event.preventDefault()
+    const trimmed = editCommentText.trim()
+    if (!trimmed) return
+
+    try {
+      setIsSubmittingEdit(true)
+      const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? ''
+      const endpoint = API_BASE_URL ? `${API_BASE_URL}/api/comments/${commentId}` : `/api/comments/${commentId}`
+      const res = await fetch(endpoint, {
+        method: 'PUT',
+        headers: getAuthHeaders(),
+        body: JSON.stringify({ content: trimmed }),
+      })
+
+      if (res.ok) {
+        setEditingCommentId(null)
+        setEditCommentText('')
+        await fetchComments()
+      } else {
+        const err = await res.json().catch(() => ({}))
+        alert(err.message || 'Failed to update comment.')
+      }
+    } catch (err) {
+      console.error('Error updating comment:', err)
+    } finally {
+      setIsSubmittingEdit(false)
+    }
+  }
+
+  const handleDeleteComment = async (commentId) => {
+    if (!window.confirm('Are you sure you want to delete this comment?')) return
+
+    try {
+      const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? ''
+      const endpoint = API_BASE_URL ? `${API_BASE_URL}/api/comments/${commentId}` : `/api/comments/${commentId}`
+      const res = await fetch(endpoint, {
+        method: 'DELETE',
+        headers: getAuthHeaders(),
+      })
+
+      if (res.ok) {
+        await fetchComments()
+        onBlogUpdated?.({ ...post, commentCount: Math.max(0, (post.commentCount || 1) - 1) })
+      } else {
+        const err = await res.json().catch(() => ({}))
+        alert(err.message || 'Failed to delete comment.')
+      }
+    } catch (err) {
+      console.error('Error deleting comment:', err)
+    }
+  }
+
+  const handleLikeComment = async (commentId) => {
+    const token = localStorage.getItem('codesprintToken') || localStorage.getItem('token')
+    if (!token) {
+      alert('Please log in to like this comment.')
+      return
+    }
+
+    try {
+      const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? ''
+      const endpoint = API_BASE_URL ? `${API_BASE_URL}/api/comments/${commentId}/react` : `/api/comments/${commentId}/react`
+      const res = await fetch(endpoint, {
+        method: 'POST',
+        headers: getAuthHeaders(),
+      })
+
+      if (res.ok) {
+        const data = await res.json()
+        // Update comment state in the tree
+        const updateTree = (list) =>
+          list.map((c) => {
+            if (c.commentId === commentId) {
+              return { ...c, likeCount: data.likeCount, isLikedByCurrentUser: data.isLiked }
+            }
+            if (c.replies && c.replies.length > 0) {
+              return { ...c, replies: updateTree(c.replies) }
+            }
+            return c
+          })
+        setComments((prev) => updateTree(prev))
+      }
+    } catch (err) {
+      console.error('Error liking comment:', err)
+    }
+  }
+
+  const handleDeleteBlog = async () => {
+    if (!window.confirm('Are you sure you want to delete this blog post? This action cannot be undone.')) {
+      return
+    }
+
+    try {
+      setIsDeletingBlog(true)
+      const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? ''
+      const endpoint = API_BASE_URL ? `${API_BASE_URL}/api/blogs/${post.blogId}` : `/api/blogs/${post.blogId}`
+      const res = await fetch(endpoint, {
+        method: 'DELETE',
+        headers: getAuthHeaders(),
+      })
+
+      if (res.ok) {
+        onDeleteBlog?.(post.blogId)
+      } else {
+        const err = await res.json().catch(() => ({}))
+        alert(err.message || 'Failed to delete blog post.')
+      }
+    } catch (err) {
+      console.error('Error deleting blog:', err)
+      alert('Network error while deleting blog.')
+    } finally {
+      setIsDeletingBlog(false)
+    }
+  }
+
+  const badgeLabel = useMemo(() => {
+    const count = post.commentCount ?? comments.length
+    if (count === 0) return 'No comments yet'
+    if (count === 1) return '1 comment'
+    return `${count} comments`
+  }, [post.commentCount, comments.length])
+
+  // Split content by newlines into paragraphs
+  const paragraphs = useMemo(() => {
+    if (Array.isArray(post.body)) return post.body
+    if (typeof post.content === 'string') {
+      return post.content.split('\n').filter((p) => p.trim().length > 0)
+    }
+    return []
+  }, [post.content, post.body])
+
+  const renderCommentNode = (comment, depth = 0) => {
+    const isCommentAuthor =
+      (currentUsername && comment.authorUsername && currentUsername.toLowerCase() === comment.authorUsername.toLowerCase()) ||
+      (currentUserId && comment.authorId && String(currentUserId) === String(comment.authorId))
+
+    const isEditing = editingCommentId === comment.commentId
+    const isReplying = activeReplyId === comment.commentId
 
     return (
       <div
-        key={pathKey}
-        className="rounded-2xl bg-white px-4 py-3 text-sm text-slate-700 shadow-sm"
+        key={comment.commentId}
+        className="rounded-2xl border border-slate-200/80 bg-white px-4 py-3 text-sm text-slate-700 shadow-sm transition hover:border-slate-300"
         style={{ marginLeft: depth > 0 ? `${Math.min(depth, 4) * 1.25}rem` : 0 }}
       >
         <div className="flex items-start justify-between gap-3">
-          <div>
-            <p className="mb-1 font-semibold text-slate-900">{comment.author}</p>
-            <p>{comment.text}</p>
+          <div className="flex-1">
+            <div className="flex items-center gap-2">
+              <span className="font-semibold text-slate-900">{comment.authorUsername || comment.author || 'Anonymous'}</span>
+              <span className="h-1 w-1 rounded-full bg-slate-300" />
+              <span className="text-xs text-slate-400">{formatBlogDate(comment.createdAt || comment.timePosted)}</span>
+            </div>
+
+            {isEditing ? (
+              <form onSubmit={(e) => handleUpdateComment(e, comment.commentId)} className="mt-2 space-y-2">
+                <input
+                  type="text"
+                  value={editCommentText}
+                  onChange={(e) => setEditCommentText(e.target.value)}
+                  className="w-full rounded-xl border border-blue-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:ring-2 focus:ring-blue-400"
+                  autoFocus
+                />
+                <div className="flex gap-2">
+                  <button
+                    type="submit"
+                    disabled={isSubmittingEdit}
+                    className="rounded-lg bg-blue-600 px-3 py-1 text-xs font-semibold text-white transition hover:bg-blue-700 disabled:opacity-50"
+                  >
+                    Save
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setEditingCommentId(null)
+                      setEditCommentText('')
+                    }}
+                    className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-semibold text-slate-600 transition hover:bg-slate-100"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </form>
+            ) : (
+              <p className="mt-1 text-slate-800 leading-relaxed">{comment.content || comment.text}</p>
+            )}
           </div>
 
-          <button
-            type="button"
-            onClick={() => {
-              setCommentsOpen(true)
-              setActiveReplyPath((current) => (current === pathKey ? null : pathKey))
-              setReplyText('')
-            }}
-            className="shrink-0 text-sm font-semibold text-blue-600 transition hover:text-blue-700"
-          >
-            Reply
-          </button>
+          <div className="flex items-center gap-1.5 shrink-0">
+            {/* Comment Like Button */}
+            <button
+              type="button"
+              onClick={() => handleLikeComment(comment.commentId)}
+              className={`inline-flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-semibold transition ${
+                comment.isLikedByCurrentUser
+                  ? 'bg-rose-50 text-rose-600 hover:bg-rose-100'
+                  : 'text-slate-500 hover:bg-slate-100 hover:text-slate-700'
+              }`}
+              title="Like comment"
+            >
+              <svg viewBox="0 0 24 24" fill={comment.isLikedByCurrentUser ? 'currentColor' : 'none'} className="h-3.5 w-3.5" aria-hidden="true">
+                <path
+                  d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"
+                  stroke="currentColor"
+                  strokeWidth="1.5"
+                />
+              </svg>
+              <span>{comment.likeCount ?? 0}</span>
+            </button>
+
+            {/* Reply Button */}
+            <button
+              type="button"
+              onClick={() => {
+                setActiveReplyId((curr) => (curr === comment.commentId ? null : comment.commentId))
+                setReplyText('')
+              }}
+              className="text-xs font-semibold text-blue-600 transition hover:text-blue-700 px-2 py-1 hover:bg-blue-50 rounded-lg"
+            >
+              Reply
+            </button>
+
+            {/* Comment Author Edit/Delete */}
+            {isCommentAuthor && !isEditing && (
+              <>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setEditingCommentId(comment.commentId)
+                    setEditCommentText(comment.content || comment.text || '')
+                  }}
+                  className="text-xs font-semibold text-slate-500 transition hover:text-slate-700 px-1.5 py-1 hover:bg-slate-100 rounded-lg"
+                >
+                  Edit
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleDeleteComment(comment.commentId)}
+                  className="text-xs font-semibold text-rose-500 transition hover:text-rose-700 px-1.5 py-1 hover:bg-rose-50 rounded-lg"
+                >
+                  Delete
+                </button>
+              </>
+            )}
+          </div>
         </div>
 
-        <div className="mt-3 space-y-2 border-l border-slate-200 pl-4">
-          {(comment.replies ?? []).map((reply, replyIndex) =>
-            renderCommentThread(reply, [...path, replyIndex], depth + 1),
-          )}
-
-          {activeReplyPath === pathKey && (
-            <form className="flex flex-col gap-2 sm:flex-row" onSubmit={(event) => handleReplySubmit(event, pathKey)}>
+        {/* Reply form and sub-replies */}
+        <div className="mt-3 space-y-2 border-l-2 border-blue-100 pl-3">
+          {isReplying && (
+            <form className="flex flex-col gap-2 sm:flex-row py-1" onSubmit={(e) => handleReplySubmit(e, comment.commentId)}>
               <input
                 type="text"
                 value={replyText}
-                onChange={(event) => setReplyText(event.target.value)}
-                placeholder={`Reply to ${comment.author}`}
-                className="h-10 flex-1 rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-blue-400"
+                onChange={(e) => setReplyText(e.target.value)}
+                placeholder={`Reply to ${comment.authorUsername || 'author'}...`}
+                className="h-9 flex-1 rounded-xl border border-slate-200 bg-slate-50 px-3 text-xs text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-blue-400 focus:bg-white"
+                autoFocus
               />
-              <button
-                type="submit"
-                className="inline-flex h-10 items-center justify-center rounded-xl bg-blue-600 px-4 text-sm font-semibold text-white transition hover:bg-blue-700"
-              >
-                Send
-              </button>
+              <div className="flex gap-1.5">
+                <button
+                  type="submit"
+                  disabled={isSubmittingReply}
+                  className="inline-flex h-9 items-center justify-center rounded-xl bg-blue-600 px-3 text-xs font-semibold text-white transition hover:bg-blue-700 disabled:opacity-50"
+                >
+                  Send
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setActiveReplyId(null)}
+                  className="inline-flex h-9 items-center justify-center rounded-xl border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-600 transition hover:bg-slate-100"
+                >
+                  Cancel
+                </button>
+              </div>
             </form>
           )}
+
+          {(comment.replies ?? []).map((reply) => renderCommentNode(reply, depth + 1))}
         </div>
       </div>
     )
   }
 
   return (
-    <article className="overflow-hidden rounded-[28px] border border-slate-200 bg-white/95 shadow-[0_20px_60px_rgba(15,23,42,0.08)]">
-      <div className="border-b border-slate-100 bg-[linear-gradient(135deg,rgba(59,130,246,0.12),rgba(255,255,255,0))] px-6 py-5 sm:px-7">
-        <div className="flex flex-wrap items-center justify-between gap-3">
+    <article className="overflow-hidden rounded-[28px] border border-slate-200 bg-white shadow-[0_20px_60px_rgba(15,23,42,0.06)] transition hover:shadow-[0_24px_70px_rgba(15,23,42,0.1)]">
+      {/* Header */}
+      <div className="border-b border-slate-100 bg-[linear-gradient(135deg,rgba(59,130,246,0.08),rgba(255,255,255,0))] px-6 py-5 sm:px-7">
+        <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <div className="mb-2 inline-flex rounded-full bg-blue-50 px-3 py-1 text-xs font-semibold uppercase tracking-[0.2em] text-blue-700">
               Blog post
             </div>
-            <h2 className="text-xl font-semibold text-slate-900 sm:text-2xl">{post.title}</h2>
+            <h2 className="text-xl font-semibold text-slate-900 sm:text-2xl leading-tight">{post.title}</h2>
           </div>
 
-          <div className="rounded-2xl border border-blue-100 bg-blue-50 px-4 py-2 text-right text-sm text-blue-700">
-            <p className="font-semibold">{voteCount} votes</p>
-            <p className="text-xs text-blue-600/80">{badgeLabel}</p>
+          <div className="flex items-center gap-2">
+            <div className="rounded-2xl border border-blue-100 bg-blue-50/80 px-4 py-2 text-right text-sm text-blue-700">
+              <p className="font-semibold">{likeCount} {likeCount === 1 ? 'like' : 'likes'}</p>
+              <p className="text-xs text-blue-600/80">{badgeLabel}</p>
+            </div>
+
+            {/* Author actions: Edit & Delete */}
+            {isAuthor && (
+              <div className="flex items-center gap-1.5 ml-2">
+                <button
+                  type="button"
+                  onClick={() => onEditBlog?.(post)}
+                  className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 shadow-sm transition hover:border-blue-300 hover:bg-blue-50 hover:text-blue-700"
+                  title="Edit your blog post"
+                >
+                  Edit
+                </button>
+                <button
+                  type="button"
+                  disabled={isDeletingBlog}
+                  onClick={handleDeleteBlog}
+                  className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-semibold text-rose-700 shadow-sm transition hover:bg-rose-100 disabled:opacity-50"
+                  title="Delete your blog post"
+                >
+                  {isDeletingBlog ? 'Deleting...' : 'Delete'}
+                </button>
+              </div>
+            )}
           </div>
         </div>
 
         <div className="mt-4 flex flex-wrap items-center gap-3 text-sm text-slate-500">
-          <span className="font-medium text-slate-700">{post.author}</span>
+          <span className="inline-flex items-center gap-1.5 font-medium text-slate-700">
+            <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-blue-100 text-xs font-bold text-blue-700">
+              {(post.authorUsername || post.author || 'U').charAt(0).toUpperCase()}
+            </span>
+            {post.authorUsername || post.author}
+          </span>
           <span className="h-1 w-1 rounded-full bg-slate-300" />
-          <span>{post.timePosted}</span>
+          <span>{formatBlogDate(post.createdAt || post.timePosted)}</span>
         </div>
       </div>
 
+      {/* Body & Actions */}
       <div className="space-y-5 px-6 py-5 sm:px-7">
         <div className="space-y-4 text-[15px] leading-7 text-slate-700 sm:text-base">
-          {post.body.map((paragraph, index) => (
-            <p key={`${post.id}-body-${index}`}>{paragraph}</p>
-          ))}
+          {paragraphs.length > 0 ? (
+            paragraphs.map((paragraph, index) => <p key={`${post.blogId || post.id}-body-${index}`}>{paragraph}</p>)
+          ) : (
+            <p className="text-slate-400 italic">No content provided.</p>
+          )}
         </div>
 
-        <div className="flex flex-wrap gap-3">
-          <ActionButton label="Comment" active={commentsOpen} onClick={() => setCommentsOpen((current) => !current)}>
+        {/* Action Buttons */}
+        <div className="flex flex-wrap gap-3 pt-2">
+          {/* Like Button */}
+          <button
+            type="button"
+            onClick={handleLikeBlog}
+            disabled={isLiking}
+            className={`inline-flex items-center gap-2 rounded-full border px-5 py-2.5 text-sm font-semibold transition ${
+              isLiked
+                ? 'border-rose-500 bg-rose-600 text-white shadow-sm hover:bg-rose-700'
+                : 'border-rose-200 bg-rose-50/80 text-rose-700 hover:bg-rose-100'
+            }`}
+          >
+            <svg viewBox="0 0 24 24" fill={isLiked ? 'currentColor' : 'none'} className="h-4 w-4" aria-hidden="true">
+              <path
+                d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"
+                stroke="currentColor"
+                strokeWidth="1.8"
+              />
+            </svg>
+            <span>{isLiked ? 'Liked' : 'Like'} ({likeCount})</span>
+          </button>
+
+          {/* Comment Toggle Button */}
+          <button
+            type="button"
+            onClick={handleToggleComments}
+            className={`inline-flex items-center gap-2 rounded-full border px-5 py-2.5 text-sm font-semibold transition ${
+              commentsOpen
+                ? 'border-blue-500 bg-blue-600 text-white shadow-sm'
+                : 'border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-100'
+            }`}
+          >
             <svg viewBox="0 0 24 24" fill="none" className="h-4 w-4" aria-hidden="true">
               <path d="M4 5.5h16v10H8l-4 4v-4H4v-10z" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" />
             </svg>
-          </ActionButton>
-
-          <ActionButton label="Up vote" active={activeVote === 'up'} onClick={() => handleVote('up')}>
-            <VoteIcon direction="up" />
-          </ActionButton>
-
-          <ActionButton label="Down vote" active={activeVote === 'down'} onClick={() => handleVote('down')}>
-            <VoteIcon direction="down" />
-          </ActionButton>
+            <span>Comments ({post.commentCount ?? comments.length})</span>
+          </button>
         </div>
 
+        {/* Comment Section */}
         {commentsOpen && (
-          <div className="rounded-3xl border border-slate-200 bg-slate-50 p-4">
+          <div className="rounded-3xl border border-slate-200 bg-slate-50/80 p-5 mt-4 transition">
+            <h3 className="text-base font-semibold text-slate-800 mb-3">Discussion ({comments.length})</h3>
+
             <form className="flex flex-col gap-3 sm:flex-row" onSubmit={handleCommentSubmit}>
               <input
                 type="text"
                 value={commentText}
-                onChange={(event) => setCommentText(event.target.value)}
-                placeholder="Write a comment"
-                className="h-11 flex-1 rounded-2xl border border-slate-200 bg-white px-4 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-blue-400"
+                onChange={(e) => setCommentText(e.target.value)}
+                placeholder="Share your thoughts on this post..."
+                className="h-11 flex-1 rounded-2xl border border-slate-200 bg-white px-4 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
               />
               <button
                 type="submit"
-                className="inline-flex h-11 items-center justify-center rounded-2xl bg-blue-600 px-5 text-sm font-semibold text-white transition hover:bg-blue-700"
+                disabled={isSubmittingComment}
+                className="inline-flex h-11 items-center justify-center rounded-2xl bg-blue-600 px-6 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700 disabled:opacity-60"
               >
-                Post comment
+                {isSubmittingComment ? 'Posting...' : 'Post Comment'}
               </button>
             </form>
 
-            <div className="mt-4 space-y-3">
-              {comments.length === 0 ? (
-                <p className="text-sm text-slate-500">No comments yet.</p>
+            <div className="mt-5 space-y-3">
+              {isLoadingComments ? (
+                <div className="flex items-center justify-center py-6 text-sm text-slate-500">
+                  <svg className="h-5 w-5 animate-spin text-blue-600 mr-2" viewBox="0 0 24 24" fill="none">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                  </svg>
+                  Loading comments...
+                </div>
+              ) : comments.length === 0 ? (
+                <div className="rounded-2xl border border-dashed border-slate-200 py-6 text-center text-sm text-slate-500 bg-white/50">
+                  No comments yet. Start the conversation!
+                </div>
               ) : (
-                comments.map((comment, index) => renderCommentThread(comment, [index]))
+                comments.map((comment) => renderCommentNode(comment, 0))
               )}
             </div>
           </div>

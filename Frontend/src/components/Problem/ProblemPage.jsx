@@ -66,61 +66,90 @@ function Avatar({ username }) {
   )
 }
 
-function DiscussionThread({ item, depth = 0, onLike, onReply, replyTargetId, setReplyTargetId, replyText, setReplyText }) {
-  const isReplying = replyTargetId === item.id
+function formatTimeAgo(dateStr) {
+  if (!dateStr) return 'Just now'
+  try {
+    const date = new Date(dateStr)
+    const now = new Date()
+    const diffInSeconds = Math.floor((now - date) / 1000)
+    if (diffInSeconds < 60) return 'Just now'
+    const minutes = Math.floor(diffInSeconds / 60)
+    if (minutes < 60) return `${minutes}m ago`
+    const hours = Math.floor(minutes / 60)
+    if (hours < 24) return `${hours}h ago`
+    const days = Math.floor(hours / 24)
+    if (days < 30) return `${days}d ago`
+    return date.toLocaleDateString()
+  } catch (e) {
+    return 'Just now'
+  }
+}
+
+function CommentItem({
+  comment,
+  discussionId,
+  currentUsername,
+  replyTargetId,
+  setReplyTargetId,
+  replyText,
+  setReplyText,
+  onReply,
+  onDeleteComment,
+  depth = 0,
+}) {
+  const isReplying = replyTargetId === comment.commentId
+  const isOwner = currentUsername && currentUsername.toLowerCase() === (comment.authorUsername || '').toLowerCase()
 
   return (
-    <div className={cn(
-      'rounded-2xl border bg-white p-4 shadow-sm transition-all',
-      depth > 0 ? 'ml-8 border-blue-100 border-l-2' : 'border-slate-100',
-    )}>
-      {/* Header */}
+    <div
+      className={cn(
+        'rounded-xl border bg-white p-3.5 shadow-sm transition-all',
+        depth > 0 ? 'ml-6 sm:ml-8 border-blue-100 border-l-2 bg-blue-50/20' : 'border-slate-100',
+      )}
+    >
       <div className="flex items-start justify-between gap-3">
         <div className="flex items-center gap-2.5">
-          <Avatar username={item.username} />
+          <Avatar username={comment.authorUsername || 'User'} />
           <div>
-            <p className="text-sm font-semibold text-slate-800 leading-none">{item.username}</p>
-            <p className="text-[11px] text-slate-400 mt-0.5">{item.time}</p>
+            <p className="text-sm font-semibold text-slate-800 leading-none">{comment.authorUsername || 'Anonymous'}</p>
+            <p className="text-[11px] text-slate-400 mt-0.5">{formatTimeAgo(comment.createdAt)}</p>
           </div>
         </div>
-        <button
-          type="button"
-          onClick={() => {
-            if (isReplying) {
-              setReplyTargetId(null)
-            } else {
-              setReplyTargetId(item.id)
-              setReplyText('')
-            }
-          }}
-          className="flex-shrink-0 rounded-full bg-slate-50 hover:bg-blue-50 border border-slate-200 hover:border-blue-200 px-3 py-1 text-xs font-semibold text-slate-500 hover:text-blue-600 transition-all"
-        >
-          {isReplying ? '✕ Cancel' : '↩ Reply'}
-        </button>
+        <div className="flex items-center gap-1.5">
+          <button
+            type="button"
+            onClick={() => {
+              if (isReplying) {
+                setReplyTargetId(null)
+              } else {
+                setReplyTargetId(comment.commentId)
+                setReplyText('')
+              }
+            }}
+            className="rounded-full bg-slate-50 hover:bg-blue-50 border border-slate-200 hover:border-blue-200 px-2.5 py-1 text-xs font-semibold text-slate-500 hover:text-blue-600 transition-all"
+          >
+            {isReplying ? '✕ Cancel' : '↩ Reply'}
+          </button>
+          {isOwner && (
+            <button
+              type="button"
+              onClick={() => onDeleteComment(comment.commentId)}
+              className="rounded-full bg-slate-50 hover:bg-rose-50 border border-slate-200 hover:border-rose-200 px-2.5 py-1 text-xs font-semibold text-slate-400 hover:text-rose-600 transition-all"
+              title="Delete comment"
+            >
+              ✕
+            </button>
+          )}
+        </div>
       </div>
 
-      {/* Comment body */}
-      <p className="mt-3 ml-10 text-sm leading-relaxed text-slate-600">{item.comment}</p>
+      <p className="mt-2.5 ml-10 text-sm leading-relaxed text-slate-700 whitespace-pre-wrap">{comment.content}</p>
 
-      {/* Like */}
-      <div className="mt-3 ml-10">
-        <button
-          type="button"
-          onClick={() => onLike(item.id)}
-          className="inline-flex items-center gap-1.5 rounded-full bg-blue-50/60 hover:bg-blue-100 border border-blue-100 px-3 py-1 text-xs text-blue-700 font-semibold transition-all"
-        >
-          <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-            <path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3zM7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3" />
-          </svg>
-          {item.likes} {item.likes === 1 ? 'Like' : 'Likes'}
-        </button>
-      </div>
-
-      {/* Inline reply box */}
+      {/* Inline Reply Form */}
       {isReplying && (
-        <div className="mt-4 ml-10 p-3 bg-slate-50/80 rounded-xl border border-slate-200">
-          <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-2">
-            Reply to {item.username}
+        <div className="mt-3 ml-10 p-3 bg-slate-50/90 rounded-xl border border-slate-200">
+          <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">
+            Reply to {comment.authorUsername}
           </p>
           <textarea
             className="w-full border border-slate-200 rounded-xl p-2.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/25 text-slate-800 resize-none"
@@ -134,14 +163,14 @@ function DiscussionThread({ item, depth = 0, onLike, onReply, replyTargetId, set
             <button
               type="button"
               onClick={() => setReplyTargetId(null)}
-              className="px-3 py-1.5 rounded-full text-xs font-semibold text-slate-500 hover:bg-slate-200 transition-all"
+              className="px-3 py-1 rounded-full text-xs font-semibold text-slate-500 hover:bg-slate-200 transition-all"
             >
               Cancel
             </button>
             <button
               type="button"
-              onClick={() => onReply(item.id)}
-              className="px-4 py-1.5 rounded-full bg-blue-600 hover:bg-blue-700 text-xs font-semibold text-white transition-all shadow-sm"
+              onClick={() => onReply(discussionId, comment.commentId)}
+              className="px-4 py-1 rounded-full bg-blue-600 hover:bg-blue-700 text-xs font-semibold text-white transition-all shadow-sm"
             >
               Post Reply
             </button>
@@ -149,20 +178,173 @@ function DiscussionThread({ item, depth = 0, onLike, onReply, replyTargetId, set
         </div>
       )}
 
-      {/* Nested replies */}
-      {item.replies?.length > 0 && (
-        <div className="mt-4 space-y-3">
-          {item.replies.map((reply, idx) => (
-            <DiscussionThread
-              key={`${reply.id || reply.username}-${idx}`}
-              item={reply}
-              depth={depth + 1}
-              onLike={onLike}
-              onReply={onReply}
+      {/* Nested Replies */}
+      {Array.isArray(comment.replies) && comment.replies.length > 0 && (
+        <div className="mt-3 space-y-2.5">
+          {comment.replies.map((reply) => (
+            <CommentItem
+              key={reply.commentId}
+              comment={reply}
+              discussionId={discussionId}
+              currentUsername={currentUsername}
               replyTargetId={replyTargetId}
               setReplyTargetId={setReplyTargetId}
               replyText={replyText}
               setReplyText={setReplyText}
+              onReply={onReply}
+              onDeleteComment={onDeleteComment}
+              depth={depth + 1}
+            />
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function DiscussionCard({
+  item,
+  currentUsername,
+  onLike,
+  onDeleteDiscussion,
+  onAddComment,
+  onReply,
+  onDeleteComment,
+  replyTargetId,
+  setReplyTargetId,
+  replyText,
+  setReplyText,
+}) {
+  const [showCommentBox, setShowCommentBox] = useState(false)
+  const [commentInput, setCommentInput] = useState('')
+  const [isSubmitting, setIsSubmitting] = useState(false)
+
+  const disc = item.discussion || item
+  const comments = item.comments || []
+  const isOwner = currentUsername && currentUsername.toLowerCase() === (disc.authorUsername || '').toLowerCase()
+
+  const handlePostDirectComment = async () => {
+    if (!commentInput.trim() || isSubmitting) return
+    setIsSubmitting(true)
+    try {
+      await onAddComment(disc.discussionId, commentInput.trim())
+      setCommentInput('')
+      setShowCommentBox(false)
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
+  return (
+    <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm space-y-4">
+      {/* Header */}
+      <div className="flex items-start justify-between gap-3">
+        <div className="flex items-center gap-3">
+          <Avatar username={disc.authorUsername || 'User'} />
+          <div>
+            <p className="text-sm font-bold text-slate-800 leading-none">{disc.authorUsername || 'Anonymous'}</p>
+            <p className="text-xs text-slate-400 mt-1">{formatTimeAgo(disc.createdAt)}</p>
+          </div>
+        </div>
+        {isOwner && (
+          <button
+            type="button"
+            onClick={() => onDeleteDiscussion(disc.discussionId)}
+            className="rounded-full bg-slate-50 hover:bg-rose-50 border border-slate-200 hover:border-rose-200 px-3 py-1 text-xs font-semibold text-slate-400 hover:text-rose-600 transition-all"
+            title="Delete discussion"
+          >
+            Delete
+          </button>
+        )}
+      </div>
+
+      {/* Discussion Content */}
+      <p className="text-sm leading-relaxed text-slate-700 whitespace-pre-wrap">{disc.content}</p>
+
+      {/* Actions */}
+      <div className="flex items-center gap-3 pt-2 border-t border-slate-100">
+        <button
+          type="button"
+          onClick={() => onLike(disc.discussionId)}
+          className={cn(
+            'inline-flex items-center gap-1.5 rounded-full px-3.5 py-1 text-xs font-semibold transition-all border',
+            disc.isLikedByCurrentUser
+              ? 'bg-rose-50 border-rose-200 text-rose-600 font-bold'
+              : 'bg-slate-50 hover:bg-slate-100 border-slate-200 text-slate-600',
+          )}
+        >
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            width="13"
+            height="13"
+            viewBox="0 0 24 24"
+            fill={disc.isLikedByCurrentUser ? 'currentColor' : 'none'}
+            stroke="currentColor"
+            strokeWidth="2.2"
+          >
+            <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
+          </svg>
+          {disc.likeCount || 0} {disc.likeCount === 1 ? 'Like' : 'Likes'}
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setShowCommentBox(!showCommentBox)}
+          className="inline-flex items-center gap-1.5 rounded-full bg-slate-50 hover:bg-blue-50 border border-slate-200 hover:border-blue-200 px-3.5 py-1 text-xs font-semibold text-slate-600 hover:text-blue-600 transition-all"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
+            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+          </svg>
+          {comments.length || disc.commentCount || 0} Comments
+        </button>
+      </div>
+
+      {/* Inline Comment Box */}
+      {showCommentBox && (
+        <div className="p-3 bg-slate-50/80 rounded-xl border border-slate-200">
+          <textarea
+            className="w-full border border-slate-200 rounded-xl p-2.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/25 text-slate-800 resize-none"
+            rows={2}
+            placeholder="Write a comment..."
+            value={commentInput}
+            onChange={(e) => setCommentInput(e.target.value)}
+            autoFocus
+          />
+          <div className="mt-2 flex gap-2 justify-end">
+            <button
+              type="button"
+              onClick={() => setShowCommentBox(false)}
+              className="px-3 py-1.5 rounded-full text-xs font-semibold text-slate-500 hover:bg-slate-200 transition-all"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              disabled={isSubmitting}
+              onClick={handlePostDirectComment}
+              className="px-4 py-1.5 rounded-full bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-xs font-semibold text-white transition-all shadow-sm"
+            >
+              {isSubmitting ? 'Posting...' : 'Comment'}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Nested Comments List */}
+      {comments.length > 0 && (
+        <div className="space-y-3 pt-2">
+          {comments.map((comment) => (
+            <CommentItem
+              key={comment.commentId}
+              comment={comment}
+              discussionId={disc.discussionId}
+              currentUsername={currentUsername}
+              replyTargetId={replyTargetId}
+              setReplyTargetId={setReplyTargetId}
+              replyText={replyText}
+              setReplyText={setReplyText}
+              onReply={onReply}
+              onDeleteComment={onDeleteComment}
             />
           ))}
         </div>
@@ -190,7 +372,8 @@ export default function ProblemPage({ onBack, initialTab = 'Discussion', problem
   const resolvedTab = TABS.includes(initialTab) ? initialTab : 'Discussion'
   const [activeTab, setActiveTab] = useState(resolvedTab)
 
-  const [newCommentText, setNewCommentText] = useState('')
+  const [newDiscussionText, setNewDiscussionText] = useState('')
+  const [isPostingDiscussion, setIsPostingDiscussion] = useState(false)
   const [replyTargetId, setReplyTargetId] = useState(null)
   const [replyText, setReplyText] = useState('')
   const [codeLang, setCodeLang] = useState('C++')
@@ -199,7 +382,48 @@ export default function ProblemPage({ onBack, initialTab = 'Discussion', problem
   const [editorialData, setEditorialData] = useState(problem.solution || null)
   const [isLoadingEditorial, setIsLoadingEditorial] = useState(false)
 
+  const [discussionsList, setDiscussionsList] = useState([])
+  const [isLoadingDiscussions, setIsLoadingDiscussions] = useState(false)
+
   const problemId = problem?.id ?? problem?.problemId
+  const currentUsername = localStorage.getItem('codesprintUsername') || ''
+
+  const getAuthHeaders = () => {
+    const token = localStorage.getItem('codesprintToken') || localStorage.getItem('token')
+    return {
+      'Content-Type': 'application/json',
+      Accept: 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    }
+  }
+
+  const fetchDiscussions = async () => {
+    if (!problemId) return
+    try {
+      setIsLoadingDiscussions(true)
+      const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? ''
+      const endpoint = API_BASE_URL
+        ? `${API_BASE_URL}/api/discussions/problem/${problemId}?details=true`
+        : `/api/discussions/problem/${problemId}?details=true`
+
+      const res = await fetch(endpoint, {
+        headers: getAuthHeaders(),
+      })
+
+      if (res.ok) {
+        const data = await res.json()
+        setDiscussionsList(Array.isArray(data) ? data : [])
+      }
+    } catch (err) {
+      console.error('Error fetching discussions:', err)
+    } finally {
+      setIsLoadingDiscussions(false)
+    }
+  }
+
+  useEffect(() => {
+    fetchDiscussions()
+  }, [problemId])
 
   useEffect(() => {
     if (!problemId) return
@@ -209,12 +433,7 @@ export default function ProblemPage({ onBack, initialTab = 'Discussion', problem
         setIsLoadingEditorial(true)
         const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? ''
         const endpoint = API_BASE_URL ? `${API_BASE_URL}/api/editorials/problem/${problemId}` : `/api/editorials/problem/${problemId}`
-        const token = localStorage.getItem('codesprintToken') || localStorage.getItem('token')
-        const headers = {
-          Accept: 'application/json',
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        }
-        const res = await fetch(endpoint, { headers })
+        const res = await fetch(endpoint, { headers: getAuthHeaders() })
         if (!res.ok) {
           setIsLoadingEditorial(false)
           return
@@ -255,54 +474,204 @@ export default function ProblemPage({ onBack, initialTab = 'Discussion', problem
 
   const solution = editorialData || problem.solution
 
-  /* ── handlers ── */
-  const handlePostComment = (e) => {
+  /* ── discussion handlers ── */
+  const handlePostDiscussion = async (e) => {
     e.preventDefault()
-    if (!newCommentText.trim()) return
-    const comment = {
-      id: Date.now(),
-      username: 'You',
-      time: 'Just now',
-      comment: newCommentText.trim(),
-      likes: 0,
-      replies: [],
+    if (!newDiscussionText.trim() || isPostingDiscussion) return
+
+    const token = localStorage.getItem('codesprintToken') || localStorage.getItem('token')
+    if (!token) {
+      alert('Please log in to participate in the discussion.')
+      return
     }
-    onUpdateProblem({ ...problem, discussion: [comment, ...(problem.discussion || [])] })
-    setNewCommentText('')
+
+    try {
+      setIsPostingDiscussion(true)
+      const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? ''
+      const endpoint = API_BASE_URL
+        ? `${API_BASE_URL}/api/discussions/problem/${problemId}`
+        : `/api/discussions/problem/${problemId}`
+
+      const res = await fetch(endpoint, {
+        method: 'POST',
+        headers: getAuthHeaders(),
+        body: JSON.stringify({ content: newDiscussionText.trim() }),
+      })
+
+      if (res.ok) {
+        setNewDiscussionText('')
+        await fetchDiscussions()
+      } else {
+        const errorData = await res.json().catch(() => ({}))
+        alert(errorData.message || 'Failed to post discussion.')
+      }
+    } catch (err) {
+      console.error('Error posting discussion:', err)
+      alert('Error connecting to server.')
+    } finally {
+      setIsPostingDiscussion(false)
+    }
   }
 
-  const handleLike = (commentId) => {
-    const walk = (list) =>
-      list.map((c) =>
-        c.id === commentId
-          ? { ...c, likes: c.likes + 1 }
-          : { ...c, replies: walk(c.replies || []) },
-      )
-    onUpdateProblem({ ...problem, discussion: walk(problem.discussion || []) })
+  const handleLikeDiscussion = async (discussionId) => {
+    const token = localStorage.getItem('codesprintToken') || localStorage.getItem('token')
+    if (!token) {
+      alert('Please log in to like a discussion.')
+      return
+    }
+
+    try {
+      const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? ''
+      const endpoint = API_BASE_URL
+        ? `${API_BASE_URL}/api/discussions/${discussionId}/react`
+        : `/api/discussions/${discussionId}/react`
+
+      const res = await fetch(endpoint, {
+        method: 'POST',
+        headers: getAuthHeaders(),
+      })
+
+      if (res.ok) {
+        const data = await res.json()
+        setDiscussionsList((prev) =>
+          prev.map((item) => {
+            const disc = item.discussion || item
+            if (disc.discussionId === discussionId) {
+              return {
+                ...item,
+                discussion: {
+                  ...disc,
+                  likeCount: data.likeCount,
+                  isLikedByCurrentUser: data.isLiked,
+                },
+              }
+            }
+            return item
+          }),
+        )
+      }
+    } catch (err) {
+      console.error('Error reacting to discussion:', err)
+    }
   }
 
-  const handleReply = (commentId) => {
+  const handleAddCommentToDiscussion = async (discussionId, content) => {
+    const token = localStorage.getItem('codesprintToken') || localStorage.getItem('token')
+    if (!token) {
+      alert('Please log in to comment.')
+      return
+    }
+
+    try {
+      const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? ''
+      const endpoint = API_BASE_URL
+        ? `${API_BASE_URL}/api/discussions/${discussionId}/comments`
+        : `/api/discussions/${discussionId}/comments`
+
+      const res = await fetch(endpoint, {
+        method: 'POST',
+        headers: getAuthHeaders(),
+        body: JSON.stringify({ content }),
+      })
+
+      if (res.ok) {
+        await fetchDiscussions()
+      } else {
+        const err = await res.json().catch(() => ({}))
+        alert(err.message || 'Failed to add comment.')
+      }
+    } catch (err) {
+      console.error('Error adding comment:', err)
+    }
+  }
+
+  const handleReplyToComment = async (discussionId, parentCommentId) => {
     if (!replyText.trim()) return
-    const reply = {
-      id: Date.now(),
-      username: 'You',
-      time: 'Just now',
-      comment: replyText.trim(),
-      likes: 0,
-      replies: [],
+
+    const token = localStorage.getItem('codesprintToken') || localStorage.getItem('token')
+    if (!token) {
+      alert('Please log in to reply.')
+      return
     }
-    const walk = (list) =>
-      list.map((c) =>
-        c.id === commentId
-          ? { ...c, replies: [...(c.replies || []), reply] }
-          : { ...c, replies: walk(c.replies || []) },
-      )
-    onUpdateProblem({ ...problem, discussion: walk(problem.discussion || []) })
-    setReplyText('')
-    setReplyTargetId(null)
+
+    try {
+      const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? ''
+      const endpoint = API_BASE_URL
+        ? `${API_BASE_URL}/api/discussions/${discussionId}/comments`
+        : `/api/discussions/${discussionId}/comments`
+
+      const res = await fetch(endpoint, {
+        method: 'POST',
+        headers: getAuthHeaders(),
+        body: JSON.stringify({
+          content: replyText.trim(),
+          parentCommentId,
+        }),
+      })
+
+      if (res.ok) {
+        setReplyText('')
+        setReplyTargetId(null)
+        await fetchDiscussions()
+      } else {
+        const err = await res.json().catch(() => ({}))
+        alert(err.message || 'Failed to post reply.')
+      }
+    } catch (err) {
+      console.error('Error replying to comment:', err)
+    }
   }
 
-  const discussion = problem.discussion || []
+  const handleDeleteDiscussion = async (discussionId) => {
+    if (!window.confirm('Are you sure you want to delete this discussion?')) return
+
+    try {
+      const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? ''
+      const endpoint = API_BASE_URL
+        ? `${API_BASE_URL}/api/discussions/${discussionId}`
+        : `/api/discussions/${discussionId}`
+
+      const res = await fetch(endpoint, {
+        method: 'DELETE',
+        headers: getAuthHeaders(),
+      })
+
+      if (res.ok) {
+        setDiscussionsList((prev) =>
+          prev.filter((item) => (item.discussion?.discussionId || item.discussionId) !== discussionId),
+        )
+      } else {
+        alert('Failed to delete discussion.')
+      }
+    } catch (err) {
+      console.error('Error deleting discussion:', err)
+    }
+  }
+
+  const handleDeleteComment = async (commentId) => {
+    if (!window.confirm('Are you sure you want to delete this comment?')) return
+
+    try {
+      const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? ''
+      const endpoint = API_BASE_URL
+        ? `${API_BASE_URL}/api/comments/${commentId}`
+        : `/api/comments/${commentId}`
+
+      const res = await fetch(endpoint, {
+        method: 'DELETE',
+        headers: getAuthHeaders(),
+      })
+
+      if (res.ok) {
+        await fetchDiscussions()
+      } else {
+        alert('Failed to delete comment.')
+      }
+    } catch (err) {
+      console.error('Error deleting comment:', err)
+    }
+  }
+
   const diffColor =
     problem.difficulty === 'Easy'
       ? 'bg-emerald-100 text-emerald-700'
@@ -381,17 +750,17 @@ export default function ProblemPage({ onBack, initialTab = 'Discussion', problem
           {/* ── Discussion Tab ── */}
           {activeTab === 'Discussion' && (
             <div className="space-y-6">
-              {/* New comment form */}
+              {/* New discussion form */}
               <form
-                onSubmit={handlePostComment}
+                onSubmit={handlePostDiscussion}
                 className="rounded-2xl border border-slate-200 bg-slate-50/60 p-4 flex flex-col gap-3"
               >
                 <p className="text-xs font-bold text-slate-400 uppercase tracking-widest select-none">
-                  Share your thoughts
+                  Start a discussion
                 </p>
                 <textarea
-                  value={newCommentText}
-                  onChange={(e) => setNewCommentText(e.target.value)}
+                  value={newDiscussionText}
+                  onChange={(e) => setNewDiscussionText(e.target.value)}
                   rows={3}
                   placeholder="Ask a question, share a hint, or discuss approaches with the community..."
                   className="w-full resize-none rounded-xl border border-slate-200 bg-white p-3 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500/25 shadow-sm"
@@ -399,28 +768,41 @@ export default function ProblemPage({ onBack, initialTab = 'Discussion', problem
                 <div className="flex justify-end">
                   <button
                     type="submit"
-                    className="rounded-full bg-blue-600 hover:bg-blue-700 px-5 py-2 text-sm font-semibold text-white shadow-sm transition-all active:scale-95"
+                    disabled={isPostingDiscussion || !newDiscussionText.trim()}
+                    className="rounded-full bg-blue-600 hover:bg-blue-700 disabled:opacity-50 px-5 py-2 text-sm font-semibold text-white shadow-sm transition-all active:scale-95"
                   >
-                    Post Comment
+                    {isPostingDiscussion ? 'Posting...' : 'Post Discussion'}
                   </button>
                 </div>
               </form>
 
               {/* Thread list */}
               <div className="space-y-4">
-                {discussion.length > 0 ? (
-                  discussion.map((item, idx) => (
-                    <DiscussionThread
-                      key={item.id ?? `${item.username}-${idx}`}
-                      item={item}
-                      onLike={handleLike}
-                      onReply={handleReply}
-                      replyTargetId={replyTargetId}
-                      setReplyTargetId={setReplyTargetId}
-                      replyText={replyText}
-                      setReplyText={setReplyText}
-                    />
-                  ))
+                {isLoadingDiscussions ? (
+                  <div className="flex flex-col items-center justify-center py-12 text-center">
+                    <div className="h-8 w-8 animate-spin rounded-full border-4 border-blue-600 border-t-transparent mb-3" />
+                    <p className="text-sm font-medium text-slate-500">Loading discussions...</p>
+                  </div>
+                ) : discussionsList.length > 0 ? (
+                  discussionsList.map((item) => {
+                    const discId = item.discussion?.discussionId || item.discussionId
+                    return (
+                      <DiscussionCard
+                        key={discId}
+                        item={item}
+                        currentUsername={currentUsername}
+                        onLike={handleLikeDiscussion}
+                        onDeleteDiscussion={handleDeleteDiscussion}
+                        onAddComment={handleAddCommentToDiscussion}
+                        onReply={handleReplyToComment}
+                        onDeleteComment={handleDeleteComment}
+                        replyTargetId={replyTargetId}
+                        setReplyTargetId={setReplyTargetId}
+                        replyText={replyText}
+                        setReplyText={setReplyText}
+                      />
+                    )
+                  })
                 ) : (
                   <div className="flex flex-col items-center py-12 text-center">
                     <div className="w-12 h-12 rounded-full bg-blue-50 flex items-center justify-center mb-3">
@@ -428,7 +810,7 @@ export default function ProblemPage({ onBack, initialTab = 'Discussion', problem
                         <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
                       </svg>
                     </div>
-                    <p className="text-sm font-semibold text-slate-600">No comments yet</p>
+                    <p className="text-sm font-semibold text-slate-600">No discussions yet</p>
                     <p className="text-xs text-slate-400 mt-1">Be the first to start the discussion!</p>
                   </div>
                 )}
