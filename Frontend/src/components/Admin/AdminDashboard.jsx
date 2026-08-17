@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useState, useEffect, useCallback } from 'react'
 
 import AdminNavbar from './AdminNavbar'
 import ProblemComposer from './ProblemComposer'
@@ -23,10 +23,8 @@ export default function AdminDashboard({
   onNavigateBlog,
   problemsByTopic,
   setProblemsByTopic,
-  blogPosts,
-  setBlogPosts,
 }) {
-  const [currentSection, setCurrentSection] = useState('problems')
+  const [currentSection, setCurrentSection] = useState('registry')
   const [selectedTopic, setSelectedTopic] = useState(problemTopics[0])
   const [problemQuery, setProblemQuery] = useState('')
   const [postQuery, setPostQuery] = useState('')
@@ -40,11 +38,42 @@ export default function AdminDashboard({
   })
   const [problemStatus, setProblemStatus] = useState({ type: '', message: '' })
   const [isSavingProblem, setIsSavingProblem] = useState(false)
+
+  // Real Blogs state
+  const [blogs, setBlogs] = useState([])
+  const [isLoadingBlogs, setIsLoadingBlogs] = useState(false)
+  const [isPublishingBlog, setIsPublishingBlog] = useState(false)
+  const [blogStatus, setBlogStatus] = useState({ type: '', message: '' })
   const [postForm, setPostForm] = useState({
     title: '',
     author: 'Admin',
+    content: '',
     body: '',
   })
+
+  const fetchBlogs = useCallback(async () => {
+    try {
+      setIsLoadingBlogs(true)
+      const token = localStorage.getItem('codesprintToken') || localStorage.getItem('token')
+      const headers = { 'Content-Type': 'application/json' }
+      if (token) headers['Authorization'] = `Bearer ${token}`
+
+      const endpoint = API_BASE_URL ? `${API_BASE_URL}/api/blogs` : '/api/blogs'
+      const res = await fetch(endpoint, { headers })
+      if (res.ok) {
+        const data = await res.json()
+        setBlogs(Array.isArray(data) ? data : [])
+      }
+    } catch (err) {
+      console.error('Failed to fetch blogs in admin panel', err)
+    } finally {
+      setIsLoadingBlogs(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    fetchBlogs()
+  }, [fetchBlogs])
 
   const totals = useMemo(() => {
     const topicCount = Object.keys(problemsByTopic || {}).length
@@ -53,9 +82,9 @@ export default function AdminDashboard({
     return {
       topicCount,
       problemCount,
-      postCount: blogPosts?.length || 0,
+      postCount: blogs.length,
     }
-  }, [blogPosts, problemsByTopic])
+  }, [blogs, problemsByTopic])
 
   const currentProblems = problemsByTopic?.[selectedTopic] || []
   const filteredProblems = currentProblems.filter((problem) => {
@@ -64,11 +93,31 @@ export default function AdminDashboard({
     return [problem.name, problem.concept, problem.difficulty].some((field) => field.toLowerCase().includes(needle))
   })
 
-  const filteredPosts = (blogPosts || []).filter((post) => {
+  const filteredPosts = useMemo(() => {
     const needle = postQuery.trim().toLowerCase()
-    if (!needle) return true
-    return [post.title, post.author, post.body.join(' ')].some((field) => field.toLowerCase().includes(needle))
-  })
+    if (!needle) return blogs
+
+    return blogs.filter((post) => {
+      const blogIdStr = String(post.blogId || post.id || '')
+      const title = (post.title || '').toLowerCase()
+      const author = (post.authorUsername || post.author || '').toLowerCase()
+      const content = (
+        typeof post.content === 'string'
+          ? post.content
+          : Array.isArray(post.body)
+          ? post.body.join(' ')
+          : ''
+      ).toLowerCase()
+
+      return (
+        title.includes(needle) ||
+        author.includes(needle) ||
+        content.includes(needle) ||
+        blogIdStr === needle ||
+        `#${blogIdStr}` === needle
+      )
+    })
+  }, [blogs, postQuery])
 
   const handleAddProblem = async (event) => {
     event.preventDefault()
@@ -179,37 +228,82 @@ export default function AdminDashboard({
     }
   }
 
-  const handleAddPost = (event) => {
+  const handlePublishPost = async (event) => {
     event.preventDefault()
 
     const title = postForm.title.trim()
-    const author = postForm.author.trim()
-    const body = postForm.body.trim()
+    const content = (postForm.content || postForm.body || '').trim()
 
-    if (!title || !body) return
+    if (!title || !content) return
 
-    setBlogPosts((current) => {
-      const nextId = current.reduce((maxId, post) => Math.max(maxId, post.id), 0) + 1
+    const token = localStorage.getItem('codesprintToken') || localStorage.getItem('token')
+    if (!token) {
+      setBlogStatus({ type: 'error', message: 'Please sign in to publish a blog.' })
+      return
+    }
 
-      return [
-        {
-          id: nextId,
-          title,
-          author: author || 'Admin',
-          timePosted: 'Just now',
-          body: body.split('\n').map((line) => line.trim()).filter(Boolean),
-          comments: [],
-          votes: 0,
+    try {
+      setIsPublishingBlog(true)
+      setBlogStatus({ type: '', message: '' })
+
+      const endpoint = API_BASE_URL ? `${API_BASE_URL}/api/blogs` : '/api/blogs'
+      const res = await fetch(endpoint, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
         },
-        ...current,
-      ]
-    })
+        body: JSON.stringify({ title, content }),
+      })
 
-    setPostForm({ title: '', author: 'Admin', body: '' })
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}))
+        throw new Error(body?.message || 'Failed to publish blog post.')
+      }
+
+      const createdBlog = await res.json()
+      setBlogs((current) => [createdBlog, ...current])
+      setPostForm({ title: '', author: 'Admin', content: '', body: '' })
+      setBlogStatus({ type: 'success', message: 'Blog post published successfully!' })
+      setTimeout(() => setBlogStatus({ type: '', message: '' }), 4000)
+    } catch (err) {
+      setBlogStatus({
+        type: 'error',
+        message: err instanceof Error ? err.message : 'Failed to publish blog.',
+      })
+    } finally {
+      setIsPublishingBlog(false)
+    }
   }
 
-  const handleDeletePost = (id) => {
-    setBlogPosts((current) => current.filter((post) => post.id !== id))
+  const handleDeletePost = async (id) => {
+    const token = localStorage.getItem('codesprintToken') || localStorage.getItem('token')
+    if (!token) {
+      setBlogStatus({ type: 'error', message: 'Please log in to delete blogs.' })
+      return
+    }
+
+    try {
+      const endpoint = API_BASE_URL ? `${API_BASE_URL}/api/blogs/${id}` : `/api/blogs/${id}`
+      const res = await fetch(endpoint, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}` },
+      })
+
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}))
+        throw new Error(body?.message || 'Failed to delete blog post.')
+      }
+
+      setBlogs((current) => current.filter((post) => (post.blogId ?? post.id) !== id))
+      setBlogStatus({ type: 'success', message: `Blog #${id} deleted successfully.` })
+      setTimeout(() => setBlogStatus({ type: '', message: '' }), 4000)
+    } catch (err) {
+      setBlogStatus({
+        type: 'error',
+        message: err instanceof Error ? err.message : 'Failed to delete blog.',
+      })
+    }
   }
 
   return (
@@ -225,7 +319,7 @@ export default function AdminDashboard({
         <div className="grid gap-4 md:grid-cols-3">
           <StatCard label="Topics" value={totals.topicCount} hint="The full problem catalog is grouped by topic." />
           <StatCard label="Problems" value={totals.problemCount} hint="Add or remove problems without touching the user view." />
-          <StatCard label="Posts" value={totals.postCount} hint="Keep the blog feed clean by removing outdated posts." />
+          <StatCard label="Blogs & Posts" value={totals.postCount} hint="All platform blogs synced in real-time." />
         </div>
 
         {currentSection === 'composer' && (
@@ -262,11 +356,16 @@ export default function AdminDashboard({
             <PostManager
               postForm={postForm}
               onChange={(field, value) => setPostForm((current) => ({ ...current, [field]: value }))}
-              onSubmit={handleAddPost}
+              onSubmit={handlePublishPost}
+              isPublishing={isPublishingBlog}
               postQuery={postQuery}
               onChangeQuery={setPostQuery}
               filteredPosts={filteredPosts}
+              allPostsCount={blogs.length}
               onDeletePost={handleDeletePost}
+              onRefresh={fetchBlogs}
+              isLoading={isLoadingBlogs}
+              actionStatus={blogStatus}
             />
           </div>
         )}
@@ -285,11 +384,16 @@ export default function AdminDashboard({
             <PostManager
               postForm={postForm}
               onChange={(field, value) => setPostForm((current) => ({ ...current, [field]: value }))}
-              onSubmit={handleAddPost}
+              onSubmit={handlePublishPost}
+              isPublishing={isPublishingBlog}
               postQuery={postQuery}
               onChangeQuery={setPostQuery}
               filteredPosts={filteredPosts}
+              allPostsCount={blogs.length}
               onDeletePost={handleDeletePost}
+              onRefresh={fetchBlogs}
+              isLoading={isLoadingBlogs}
+              actionStatus={blogStatus}
             />
           </div>
         )}

@@ -126,7 +126,10 @@ public class BlogService {
         Blog blog = blogRepository.findById(blogId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Blog not found with id: " + blogId));
 
-        if (!blog.getUser().getUserId().equals(user.getUserId())) {
+        boolean isOwner = blog.getUser().getUserId().equals(user.getUserId());
+        boolean isAdmin = user.getRole() != null && user.getRole().toUpperCase().contains("ADMIN");
+
+        if (!isOwner && !isAdmin) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "You do not have permission to delete this blog");
         }
 
@@ -258,7 +261,10 @@ public class BlogService {
         Comment comment = commentRepository.findById(commentId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Comment not found with id: " + commentId));
 
-        if (!comment.getUser().getUserId().equals(user.getUserId())) {
+        boolean isOwner = comment.getUser().getUserId().equals(user.getUserId());
+        boolean isAdmin = user.getRole() != null && user.getRole().toUpperCase().contains("ADMIN");
+
+        if (!isOwner && !isAdmin) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "You do not have permission to delete this comment");
         }
 

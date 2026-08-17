@@ -2,7 +2,7 @@ export default function AdminNavbar({ currentSection, onSwitchSection, onExitAdm
   const sections = [
     { key: 'composer', label: 'Problem Composer' },
     { key: 'registry', label: 'Problem Registry' },
-    { key: 'posts', label: 'Post Manager' },
+    { key: 'posts', label: 'Blog Manager' },
     { key: 'preview', label: 'Preview' },
   ]
 

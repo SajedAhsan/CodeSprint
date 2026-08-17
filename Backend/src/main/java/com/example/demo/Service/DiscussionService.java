@@ -143,7 +143,10 @@ public class DiscussionService {
         Discussion discussion = discussionRepository.findById(discussionId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Discussion not found with id: " + discussionId));
 
-        if (!discussion.getUser().getUserId().equals(user.getUserId())) {
+        boolean isOwner = discussion.getUser().getUserId().equals(user.getUserId());
+        boolean isAdmin = user.getRole() != null && user.getRole().toUpperCase().contains("ADMIN");
+
+        if (!isOwner && !isAdmin) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "You do not have permission to delete this discussion");
         }
 
@@ -253,7 +256,10 @@ public class DiscussionService {
         Comment comment = commentRepository.findById(commentId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Comment not found with id: " + commentId));
 
-        if (!comment.getUser().getUserId().equals(user.getUserId())) {
+        boolean isOwner = comment.getUser().getUserId().equals(user.getUserId());
+        boolean isAdmin = user.getRole() != null && user.getRole().toUpperCase().contains("ADMIN");
+
+        if (!isOwner && !isAdmin) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "You do not have permission to delete this comment");
         }
 
