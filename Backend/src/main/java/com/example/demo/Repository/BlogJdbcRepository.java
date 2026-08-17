@@ -1,5 +1,6 @@
 package com.example.demo.Repository;
 
+import com.example.demo.dto.AttachmentResponse;
 import com.example.demo.dto.BlogResponse;
 import com.example.demo.dto.CommentResponse;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -12,9 +13,11 @@ import java.util.*;
 public class BlogJdbcRepository {
 
     private final JdbcTemplate jdbcTemplate;
+    private final AttachmentJdbcRepository attachmentJdbcRepository;
 
-    public BlogJdbcRepository(JdbcTemplate jdbcTemplate) {
+    public BlogJdbcRepository(JdbcTemplate jdbcTemplate, AttachmentJdbcRepository attachmentJdbcRepository) {
         this.jdbcTemplate = jdbcTemplate;
+        this.attachmentJdbcRepository = attachmentJdbcRepository;
     }
 
     public void linkCommentToBlog(Integer commentId, Integer blogId) {
@@ -54,7 +57,7 @@ public class BlogJdbcRepository {
                 ORDER BY b.created_at DESC
                 """;
 
-        return jdbcTemplate.query(
+        List<BlogResponse> blogs = jdbcTemplate.query(
                 sql,
                 (rs, rowNum) -> {
                     Timestamp createdTs = rs.getTimestamp("created_at");
@@ -75,6 +78,16 @@ public class BlogJdbcRepository {
                 },
                 currentUserId
         );
+
+        if (!blogs.isEmpty()) {
+            List<Integer> blogIds = blogs.stream().map(BlogResponse::getBlogId).toList();
+            Map<Integer, List<AttachmentResponse>> attachmentsMap = attachmentJdbcRepository.findAttachmentsForBlogIds(blogIds);
+            for (BlogResponse blog : blogs) {
+                blog.setAttachments(attachmentsMap.getOrDefault(blog.getBlogId(), Collections.emptyList()));
+            }
+        }
+
+        return blogs;
     }
 
     public Optional<BlogResponse> findBlogSummaryById(Integer blogId, Integer currentUserId) {
@@ -132,7 +145,10 @@ public class BlogJdbcRepository {
                 blogId
         );
 
-        return results.stream().findFirst();
+        Optional<BlogResponse> optBlog = results.stream().findFirst();
+        optBlog.ifPresent(blog -> blog.setAttachments(attachmentJdbcRepository.findAttachmentsByBlogId(blog.getBlogId())));
+
+        return optBlog;
     }
 
     public List<CommentResponse> findNestedCommentsByBlogId(Integer blogId, Integer currentUserId) {
@@ -188,6 +204,14 @@ public class BlogJdbcRepository {
                 currentUserId,
                 blogId
         );
+
+        if (!flatComments.isEmpty()) {
+            List<Integer> commentIds = flatComments.stream().map(CommentResponse::getCommentId).toList();
+            Map<Integer, List<AttachmentResponse>> attMap = attachmentJdbcRepository.findAttachmentsForCommentIds(commentIds);
+            for (CommentResponse c : flatComments) {
+                c.setAttachments(attMap.getOrDefault(c.getCommentId(), Collections.emptyList()));
+            }
+        }
 
         // Build hierarchical tree
         Map<Integer, CommentResponse> commentMap = new LinkedHashMap<>();

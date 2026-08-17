@@ -1,4 +1,5 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
+import AttachmentUploader from '../Shared/AttachmentUploader'
 
 const TABS = ['Discussion', 'Solution']
 
@@ -99,6 +100,20 @@ function CommentItem({
 }) {
   const isReplying = replyTargetId === comment.commentId
   const isOwner = currentUsername && currentUsername.toLowerCase() === (comment.authorUsername || '').toLowerCase()
+  const [commentAttachments, setCommentAttachments] = useState(comment.attachments ?? [])
+
+  // State for reply attachments
+  const [pendingReplyFiles, setPendingReplyFiles] = useState([])
+  const replyFileInputRef = useRef(null)
+
+  useEffect(() => {
+    setCommentAttachments(comment.attachments ?? [])
+  }, [comment.attachments])
+
+  const handlePostReply = async () => {
+    await onReply(discussionId, comment.commentId, pendingReplyFiles)
+    setPendingReplyFiles([])
+  }
 
   return (
     <div
@@ -121,9 +136,11 @@ function CommentItem({
             onClick={() => {
               if (isReplying) {
                 setReplyTargetId(null)
+                setPendingReplyFiles([])
               } else {
                 setReplyTargetId(comment.commentId)
                 setReplyText('')
+                setPendingReplyFiles([])
               }
             }}
             className="rounded-full bg-slate-50 hover:bg-blue-50 border border-slate-200 hover:border-blue-200 px-2.5 py-1 text-xs font-semibold text-slate-500 hover:text-blue-600 transition-all"
@@ -145,10 +162,25 @@ function CommentItem({
 
       <p className="mt-2.5 ml-10 text-sm leading-relaxed text-slate-700 whitespace-pre-wrap">{comment.content}</p>
 
+      {/* Comment attachments */}
+      {commentAttachments && commentAttachments.length > 0 && (
+        <div className="ml-10 mt-2">
+          <AttachmentUploader
+            entityType="comment"
+            entityId={comment.commentId}
+            attachments={commentAttachments}
+            currentUsername={currentUsername}
+            showUploadButton={false}
+            onDeleted={() => fetchDiscussions()}
+            compact
+          />
+        </div>
+      )}
+
       {/* Inline Reply Form */}
       {isReplying && (
-        <div className="mt-3 ml-10 p-3 bg-slate-50/90 rounded-xl border border-slate-200">
-          <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">
+        <div className="mt-3 ml-10 p-3 bg-slate-50/90 rounded-xl border border-slate-200 space-y-2">
+          <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1">
             Reply to {comment.authorUsername}
           </p>
           <textarea
@@ -159,17 +191,51 @@ function CommentItem({
             onChange={(e) => setReplyText(e.target.value)}
             autoFocus
           />
-          <div className="mt-2 flex gap-2 justify-end">
+          {/* File picker for reply */}
+          <div className="flex flex-wrap items-center gap-2">
+            <input
+              ref={replyFileInputRef}
+              type="file"
+              multiple
+              className="hidden"
+              accept="image/*,.pdf,.txt,.md,.cpp,.c,.java,.py,.json,.zip"
+              onChange={(e) => {
+                const newFiles = Array.from(e.target.files || [])
+                setPendingReplyFiles((prev) => {
+                  const names = new Set(prev.map((f) => f.name))
+                  return [...prev, ...newFiles.filter((f) => !names.has(f.name))]
+                })
+                e.target.value = ''
+              }}
+            />
             <button
               type="button"
-              onClick={() => setReplyTargetId(null)}
+              onClick={() => replyFileInputRef.current?.click()}
+              className="inline-flex items-center gap-1 rounded-full border border-violet-200 bg-violet-50 px-2.5 py-1 text-[11px] font-semibold text-violet-700 hover:bg-violet-100 transition-all"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48" />
+              </svg>
+              Attach
+            </button>
+            {pendingReplyFiles.map((f) => (
+              <span key={f.name} className="inline-flex items-center gap-1 rounded-full bg-violet-100 border border-violet-200 px-2 py-0.5 text-[10px] font-medium text-violet-700">
+                <span className="max-w-[100px] truncate">{f.name}</span>
+                <button type="button" onClick={() => setPendingReplyFiles((p) => p.filter((x) => x !== f))} className="text-violet-400 hover:text-rose-500 font-bold">×</button>
+              </span>
+            ))}
+          </div>
+          <div className="flex gap-2 justify-end">
+            <button
+              type="button"
+              onClick={() => { setReplyTargetId(null); setPendingReplyFiles([]) }}
               className="px-3 py-1 rounded-full text-xs font-semibold text-slate-500 hover:bg-slate-200 transition-all"
             >
               Cancel
             </button>
             <button
               type="button"
-              onClick={() => onReply(discussionId, comment.commentId)}
+              onClick={handlePostReply}
               className="px-4 py-1 rounded-full bg-blue-600 hover:bg-blue-700 text-xs font-semibold text-white transition-all shadow-sm"
             >
               Post Reply
@@ -218,17 +284,34 @@ function DiscussionCard({
   const [showCommentBox, setShowCommentBox] = useState(false)
   const [commentInput, setCommentInput] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [pendingCommentFiles, setPendingCommentFiles] = useState([])
+  const discCommentFileRef = useRef(null)
 
   const disc = item.discussion || item
   const comments = item.comments || []
+  const discAttachments = disc.attachments || item.attachments || []
   const isOwner = currentUsername && currentUsername.toLowerCase() === (disc.authorUsername || '').toLowerCase()
 
   const handlePostDirectComment = async () => {
     if (!commentInput.trim() || isSubmitting) return
     setIsSubmitting(true)
     try {
-      await onAddComment(disc.discussionId, commentInput.trim())
+      const newCommentId = await onAddComment(disc.discussionId, commentInput.trim())
+      if (pendingCommentFiles.length && newCommentId) {
+        const token = localStorage.getItem('codesprintToken') || localStorage.getItem('token')
+        if (token) {
+          const formData = new FormData()
+          pendingCommentFiles.forEach((f) => formData.append('files', f))
+          const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? ''
+          await fetch(`${API_BASE_URL}/api/attachments/comment/${newCommentId}`, {
+            method: 'POST',
+            headers: { Authorization: `Bearer ${token}` },
+            body: formData,
+          }).catch(() => {})
+        }
+      }
       setCommentInput('')
+      setPendingCommentFiles([])
       setShowCommentBox(false)
     } finally {
       setIsSubmitting(false)
@@ -260,6 +343,20 @@ function DiscussionCard({
 
       {/* Discussion Content */}
       <p className="text-sm leading-relaxed text-slate-700 whitespace-pre-wrap">{disc.content}</p>
+
+      {/* Discussion Attachments */}
+      {discAttachments && discAttachments.length > 0 && (
+        <div className="pt-1">
+          <AttachmentUploader
+            entityType="discussion"
+            entityId={disc.discussionId}
+            attachments={discAttachments}
+            currentUsername={currentUsername}
+            showUploadButton={false}
+            onDeleted={() => fetchDiscussions()}
+          />
+        </div>
+      )}
 
       {/* Actions */}
       <div className="flex items-center gap-3 pt-2 border-t border-slate-100">
@@ -301,7 +398,7 @@ function DiscussionCard({
 
       {/* Inline Comment Box */}
       {showCommentBox && (
-        <div className="p-3 bg-slate-50/80 rounded-xl border border-slate-200">
+        <div className="p-3 bg-slate-50/80 rounded-xl border border-slate-200 space-y-2">
           <textarea
             className="w-full border border-slate-200 rounded-xl p-2.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/25 text-slate-800 resize-none"
             rows={2}
@@ -310,10 +407,44 @@ function DiscussionCard({
             onChange={(e) => setCommentInput(e.target.value)}
             autoFocus
           />
-          <div className="mt-2 flex gap-2 justify-end">
+          {/* File picker for comment */}
+          <div className="flex flex-wrap items-center gap-2">
+            <input
+              ref={discCommentFileRef}
+              type="file"
+              multiple
+              className="hidden"
+              accept="image/*,.pdf,.txt,.md,.cpp,.c,.java,.py,.json,.zip"
+              onChange={(e) => {
+                const newFiles = Array.from(e.target.files || [])
+                setPendingCommentFiles((prev) => {
+                  const names = new Set(prev.map((f) => f.name))
+                  return [...prev, ...newFiles.filter((f) => !names.has(f.name))]
+                })
+                e.target.value = ''
+              }}
+            />
             <button
               type="button"
-              onClick={() => setShowCommentBox(false)}
+              onClick={() => discCommentFileRef.current?.click()}
+              className="inline-flex items-center gap-1 rounded-full border border-violet-200 bg-violet-50 px-2.5 py-1 text-[11px] font-semibold text-violet-700 hover:bg-violet-100 transition-all"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48" />
+              </svg>
+              Attach
+            </button>
+            {pendingCommentFiles.map((f) => (
+              <span key={f.name} className="inline-flex items-center gap-1 rounded-full bg-violet-100 border border-violet-200 px-2 py-0.5 text-[10px] font-medium text-violet-700">
+                <span className="max-w-[100px] truncate">{f.name}</span>
+                <button type="button" onClick={() => setPendingCommentFiles((p) => p.filter((x) => x !== f))} className="text-violet-400 hover:text-rose-500 font-bold">×</button>
+              </span>
+            ))}
+          </div>
+          <div className="flex gap-2 justify-end">
+            <button
+              type="button"
+              onClick={() => { setShowCommentBox(false); setPendingCommentFiles([]) }}
               className="px-3 py-1.5 rounded-full text-xs font-semibold text-slate-500 hover:bg-slate-200 transition-all"
             >
               Cancel
@@ -368,12 +499,14 @@ function getCodeForLanguage(codes, lang) {
 }
 
 export default function ProblemPage({ onBack, initialTab = 'Discussion', problem, onUpdateProblem }) {
-  // Normalise tab — old tabs that no longer exist fall back to Discussion
   const resolvedTab = TABS.includes(initialTab) ? initialTab : 'Discussion'
   const [activeTab, setActiveTab] = useState(resolvedTab)
 
   const [newDiscussionText, setNewDiscussionText] = useState('')
   const [isPostingDiscussion, setIsPostingDiscussion] = useState(false)
+  const [pendingDiscussionFiles, setPendingDiscussionFiles] = useState([])
+  const discussionFileInputRef = useRef(null)
+
   const [replyTargetId, setReplyTargetId] = useState(null)
   const [replyText, setReplyText] = useState('')
   const [codeLang, setCodeLang] = useState('C++')
@@ -454,6 +587,7 @@ export default function ProblemPage({ onBack, initialTab = 'Discussion', problem
               ? codes
               : (problem.solution?.codes || (problem.solution?.code ? { [problem.solution.language || 'Code']: problem.solution.code } : {})),
             video: data.videoLink || data.video || problem.solution?.video || problem.solution?.videoLink || null,
+            attachments: data.attachments || [],
           }
           setEditorialData(updated)
           if (onUpdateProblem) {
@@ -499,7 +633,24 @@ export default function ProblemPage({ onBack, initialTab = 'Discussion', problem
       })
 
       if (res.ok) {
+        const data = await res.json().catch(() => null)
+        const discId = data?.discussionId
+        if (pendingDiscussionFiles.length && discId) {
+          const formData = new FormData()
+          pendingDiscussionFiles.forEach((f) => formData.append('files', f))
+          const uploadRes = await fetch(`${API_BASE_URL}/api/attachments/discussion/${discId}`, {
+            method: 'POST',
+            headers: { Authorization: `Bearer ${token}` },
+            body: formData,
+          })
+          if (!uploadRes.ok) {
+            const errData = await uploadRes.json().catch(() => ({}))
+            console.error('Discussion attachment upload error:', errData)
+            alert(errData.message || 'Discussion was created, but attachments failed to upload.')
+          }
+        }
         setNewDiscussionText('')
+        setPendingDiscussionFiles([])
         await fetchDiscussions()
       } else {
         const errorData = await res.json().catch(() => ({}))
@@ -559,7 +710,7 @@ export default function ProblemPage({ onBack, initialTab = 'Discussion', problem
     const token = localStorage.getItem('codesprintToken') || localStorage.getItem('token')
     if (!token) {
       alert('Please log in to comment.')
-      return
+      return null
     }
 
     try {
@@ -575,17 +726,21 @@ export default function ProblemPage({ onBack, initialTab = 'Discussion', problem
       })
 
       if (res.ok) {
+        const data = await res.json().catch(() => null)
         await fetchDiscussions()
+        return data?.commentId ?? null
       } else {
         const err = await res.json().catch(() => ({}))
         alert(err.message || 'Failed to add comment.')
+        return null
       }
     } catch (err) {
       console.error('Error adding comment:', err)
+      return null
     }
   }
 
-  const handleReplyToComment = async (discussionId, parentCommentId) => {
+  const handleReplyToComment = async (discussionId, parentCommentId, files = []) => {
     if (!replyText.trim()) return
 
     const token = localStorage.getItem('codesprintToken') || localStorage.getItem('token')
@@ -610,6 +765,17 @@ export default function ProblemPage({ onBack, initialTab = 'Discussion', problem
       })
 
       if (res.ok) {
+        const data = await res.json().catch(() => null)
+        const replyId = data?.commentId
+        if (files && files.length && replyId) {
+          const formData = new FormData()
+          files.forEach((f) => formData.append('files', f))
+          await fetch(`${API_BASE_URL}/api/attachments/comment/${replyId}`, {
+            method: 'POST',
+            headers: { Authorization: `Bearer ${token}` },
+            body: formData,
+          }).catch(() => {})
+        }
         setReplyText('')
         setReplyTargetId(null)
         await fetchDiscussions()
@@ -765,7 +931,43 @@ export default function ProblemPage({ onBack, initialTab = 'Discussion', problem
                   placeholder="Ask a question, share a hint, or discuss approaches with the community..."
                   className="w-full resize-none rounded-xl border border-slate-200 bg-white p-3 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500/25 shadow-sm"
                 />
-                <div className="flex justify-end">
+
+                {/* Attachments row */}
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <input
+                      ref={discussionFileInputRef}
+                      type="file"
+                      multiple
+                      className="hidden"
+                      accept="image/*,.pdf,.txt,.md,.cpp,.c,.java,.py,.json,.zip"
+                      onChange={(e) => {
+                        const newFiles = Array.from(e.target.files || [])
+                        setPendingDiscussionFiles((prev) => {
+                          const names = new Set(prev.map((f) => f.name))
+                          return [...prev, ...newFiles.filter((f) => !names.has(f.name))]
+                        })
+                        e.target.value = ''
+                      }}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => discussionFileInputRef.current?.click()}
+                      className="inline-flex items-center gap-1.5 rounded-full border border-violet-200 bg-violet-50 px-3 py-1.5 text-xs font-semibold text-violet-700 hover:bg-violet-100 hover:border-violet-300 transition-all active:scale-95"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48" />
+                      </svg>
+                      Attach
+                    </button>
+                    {pendingDiscussionFiles.map((f) => (
+                      <span key={f.name} className="inline-flex items-center gap-1 rounded-full bg-violet-100 border border-violet-200 px-2.5 py-0.5 text-[11px] font-medium text-violet-700">
+                        <span className="max-w-[120px] truncate">{f.name}</span>
+                        <button type="button" onClick={() => setPendingDiscussionFiles((p) => p.filter((x) => x !== f))} className="text-violet-400 hover:text-rose-500 font-bold">×</button>
+                      </span>
+                    ))}
+                  </div>
+
                   <button
                     type="submit"
                     disabled={isPostingDiscussion || !newDiscussionText.trim()}
@@ -880,8 +1082,8 @@ export default function ProblemPage({ onBack, initialTab = 'Discussion', problem
                     )}
 
                     {solutionTab === 'Explanation' && (
-                      <div className="animate-in fade-in slide-in-from-bottom-2 duration-300">
-                        <p className="text-xs font-bold uppercase tracking-[0.22em] text-blue-700 mb-4">
+                      <div className="animate-in fade-in slide-in-from-bottom-2 duration-300 space-y-4">
+                        <p className="text-xs font-bold uppercase tracking-[0.22em] text-blue-700">
                           Editorial Walkthrough
                         </p>
                         {solution.explanation ? (
@@ -890,6 +1092,23 @@ export default function ProblemPage({ onBack, initialTab = 'Discussion', problem
                           </div>
                         ) : (
                           <p className="text-sm text-slate-500 italic">No explanation provided yet.</p>
+                        )}
+
+                        {/* Editorial Attachments */}
+                        {solution.attachments && solution.attachments.length > 0 && (
+                          <div className="rounded-xl border border-violet-100 bg-violet-50/50 p-4 mt-4">
+                            <p className="text-xs font-bold uppercase tracking-widest text-violet-600 mb-2">
+                              Editorial Resources & Diagrams ({solution.attachments.length})
+                            </p>
+                            <AttachmentUploader
+                              entityType="editorial"
+                              entityId={problemId}
+                              attachments={solution.attachments}
+                              currentUsername={currentUsername}
+                              disabled
+                              compact
+                            />
+                          </div>
                         )}
                       </div>
                     )}

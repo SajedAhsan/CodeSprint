@@ -1,6 +1,8 @@
 package com.example.demo.dto;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
 
 public class BlogResponse {
 
@@ -14,6 +16,7 @@ public class BlogResponse {
     private Long commentCount;
     private Long likeCount;
     private Boolean isLikedByCurrentUser;
+    private List<AttachmentResponse> attachments = new ArrayList<>();
 
     public BlogResponse() {
     }
@@ -31,6 +34,15 @@ public class BlogResponse {
         this.commentCount = commentCount != null ? commentCount : 0L;
         this.likeCount = likeCount != null ? likeCount : 0L;
         this.isLikedByCurrentUser = isLikedByCurrentUser != null ? isLikedByCurrentUser : false;
+        this.attachments = new ArrayList<>();
+    }
+
+    public List<AttachmentResponse> getAttachments() {
+        return attachments;
+    }
+
+    public void setAttachments(List<AttachmentResponse> attachments) {
+        this.attachments = attachments != null ? attachments : new ArrayList<>();
     }
 
     public Integer getBlogId() {

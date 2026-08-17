@@ -18,6 +18,7 @@ public class CommentResponse {
     private Long likeCount = 0L;
     private Boolean isLikedByCurrentUser = false;
     private List<CommentResponse> replies = new ArrayList<>();
+    private List<AttachmentResponse> attachments = new ArrayList<>();
 
     public CommentResponse() {
     }
@@ -150,5 +151,13 @@ public class CommentResponse {
 
     public void setReplies(List<CommentResponse> replies) {
         this.replies = replies;
+    }
+
+    public List<AttachmentResponse> getAttachments() {
+        return attachments;
+    }
+
+    public void setAttachments(List<AttachmentResponse> attachments) {
+        this.attachments = attachments != null ? attachments : new ArrayList<>();
     }
 }

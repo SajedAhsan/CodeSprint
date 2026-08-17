@@ -1,21 +1,24 @@
 package com.example.demo.Repository;
 
+import com.example.demo.dto.AttachmentResponse;
 import com.example.demo.dto.CommentResponse;
+import com.example.demo.dto.DiscussionDetailResponse;
 import com.example.demo.dto.DiscussionResponse;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
 
 import java.sql.Timestamp;
-import java.time.LocalDateTime;
 import java.util.*;
 
 @Repository
 public class DiscussionJdbcRepository {
 
     private final JdbcTemplate jdbcTemplate;
+    private final AttachmentJdbcRepository attachmentJdbcRepository;
 
-    public DiscussionJdbcRepository(JdbcTemplate jdbcTemplate) {
+    public DiscussionJdbcRepository(JdbcTemplate jdbcTemplate, AttachmentJdbcRepository attachmentJdbcRepository) {
         this.jdbcTemplate = jdbcTemplate;
+        this.attachmentJdbcRepository = attachmentJdbcRepository;
     }
 
     public void linkCommentToDiscussion(Integer commentId, Integer discussionId) {
@@ -56,7 +59,7 @@ public class DiscussionJdbcRepository {
                 ORDER BY d.created_at DESC
                 """;
 
-        return jdbcTemplate.query(
+        List<DiscussionResponse> discussions = jdbcTemplate.query(
                 sql,
                 (rs, rowNum) -> {
                     Timestamp createdTs = rs.getTimestamp("created_at");
@@ -78,6 +81,16 @@ public class DiscussionJdbcRepository {
                 currentUserId,
                 problemId
         );
+
+        if (!discussions.isEmpty()) {
+            List<Integer> discIds = discussions.stream().map(DiscussionResponse::getDiscussionId).toList();
+            Map<Integer, List<AttachmentResponse>> attMap = attachmentJdbcRepository.findAttachmentsForDiscussionIds(discIds);
+            for (DiscussionResponse disc : discussions) {
+                disc.setAttachments(attMap.getOrDefault(disc.getDiscussionId(), Collections.emptyList()));
+            }
+        }
+
+        return discussions;
     }
 
     public Optional<DiscussionResponse> findDiscussionSummaryById(Integer discussionId, Integer currentUserId) {
@@ -135,7 +148,10 @@ public class DiscussionJdbcRepository {
                 discussionId
         );
 
-        return results.stream().findFirst();
+        Optional<DiscussionResponse> optDisc = results.stream().findFirst();
+        optDisc.ifPresent(disc -> disc.setAttachments(attachmentJdbcRepository.findAttachmentsByDiscussionId(disc.getDiscussionId())));
+
+        return optDisc;
     }
 
     public List<CommentResponse> findNestedCommentsByDiscussionId(Integer discussionId) {
@@ -177,6 +193,14 @@ public class DiscussionJdbcRepository {
                 discussionId
         );
 
+        if (!flatComments.isEmpty()) {
+            List<Integer> commentIds = flatComments.stream().map(CommentResponse::getCommentId).toList();
+            Map<Integer, List<AttachmentResponse>> attMap = attachmentJdbcRepository.findAttachmentsForCommentIds(commentIds);
+            for (CommentResponse c : flatComments) {
+                c.setAttachments(attMap.getOrDefault(c.getCommentId(), Collections.emptyList()));
+            }
+        }
+
         // Build hierarchical tree
         Map<Integer, CommentResponse> commentMap = new LinkedHashMap<>();
         for (CommentResponse comment : flatComments) {
@@ -196,7 +220,7 @@ public class DiscussionJdbcRepository {
         return rootComments;
     }
 
-    public List<com.example.demo.dto.DiscussionDetailResponse> findDiscussionsWithDetailsByProblemId(Integer problemId, Integer currentUserId) {
+    public List<DiscussionDetailResponse> findDiscussionsWithDetailsByProblemId(Integer problemId, Integer currentUserId) {
         List<DiscussionResponse> discussions = findDiscussionsByProblemId(problemId, currentUserId);
         if (discussions.isEmpty()) {
             return Collections.emptyList();
@@ -241,13 +265,21 @@ public class DiscussionJdbcRepository {
                 problemId
         );
 
+        if (!allComments.isEmpty()) {
+            List<Integer> commentIds = allComments.stream().map(CommentResponse::getCommentId).toList();
+            Map<Integer, List<AttachmentResponse>> commentAttMap = attachmentJdbcRepository.findAttachmentsForCommentIds(commentIds);
+            for (CommentResponse c : allComments) {
+                c.setAttachments(commentAttMap.getOrDefault(c.getCommentId(), Collections.emptyList()));
+            }
+        }
+
         // Group comments by discussion_id
         Map<Integer, List<CommentResponse>> commentsByDiscussion = new HashMap<>();
         for (CommentResponse comment : allComments) {
             commentsByDiscussion.computeIfAbsent(comment.getDiscussionId(), k -> new ArrayList<>()).add(comment);
         }
 
-        List<com.example.demo.dto.DiscussionDetailResponse> result = new ArrayList<>();
+        List<DiscussionDetailResponse> result = new ArrayList<>();
         for (DiscussionResponse disc : discussions) {
             List<CommentResponse> flatForDisc = commentsByDiscussion.getOrDefault(disc.getDiscussionId(), Collections.emptyList());
 
@@ -266,7 +298,7 @@ public class DiscussionJdbcRepository {
                 }
             }
 
-            result.add(new com.example.demo.dto.DiscussionDetailResponse(disc, rootComments));
+            result.add(new DiscussionDetailResponse(disc, rootComments));
         }
 
         return result;

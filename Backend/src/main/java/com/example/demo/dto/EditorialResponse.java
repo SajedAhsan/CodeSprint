@@ -1,5 +1,6 @@
 package com.example.demo.dto;
 
+import java.util.ArrayList;
 import java.util.List;
 
 public class EditorialResponse {
@@ -7,6 +8,7 @@ public class EditorialResponse {
     private String explanation;
     private String videoLink;
     private List<SolutionItem> solutions;
+    private List<AttachmentResponse> attachments = new ArrayList<>();
 
     public static class SolutionItem {
         private Integer solutionId;
@@ -68,5 +70,13 @@ public class EditorialResponse {
 
     public void setSolutions(List<SolutionItem> solutions) {
         this.solutions = solutions;
+    }
+
+    public List<AttachmentResponse> getAttachments() {
+        return attachments;
+    }
+
+    public void setAttachments(List<AttachmentResponse> attachments) {
+        this.attachments = attachments != null ? attachments : new ArrayList<>();
     }
 }

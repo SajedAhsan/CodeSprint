@@ -21,13 +21,16 @@ public class EditorialService {
     private final EditorialRepository editorialRepository;
     private final EditorialSolutionRepository editorialSolutionRepository;
     private final ProblemRepository problemRepository;
+    private final com.example.demo.Repository.AttachmentJdbcRepository attachmentJdbcRepository;
 
     public EditorialService(EditorialRepository editorialRepository,
                             EditorialSolutionRepository editorialSolutionRepository,
-                            ProblemRepository problemRepository) {
+                            ProblemRepository problemRepository,
+                            com.example.demo.Repository.AttachmentJdbcRepository attachmentJdbcRepository) {
         this.editorialRepository = editorialRepository;
         this.editorialSolutionRepository = editorialSolutionRepository;
         this.problemRepository = problemRepository;
+        this.attachmentJdbcRepository = attachmentJdbcRepository;
     }
 
     @Transactional(readOnly = true)
@@ -41,6 +44,7 @@ public class EditorialService {
         resp.setEditorialId(editorial.getEditorialId());
         resp.setExplanation(editorial.getExplanation());
         resp.setVideoLink(editorial.getVideoLink());
+        resp.setAttachments(attachmentJdbcRepository.findAttachmentsByEditorialId(editorial.getEditorialId()));
 
         List<EditorialSolution> solutionEntities = editorialSolutionRepository.findByEditorialId(editorial.getEditorialId());
         if (solutionEntities == null || solutionEntities.isEmpty()) {

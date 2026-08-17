@@ -1,4 +1,5 @@
-import { useMemo, useState, useEffect } from 'react'
+import { useMemo, useState, useEffect, useRef } from 'react'
+import AttachmentUploader from '../Shared/AttachmentUploader'
 
 function getAuthHeaders() {
   const token = localStorage.getItem('codesprintToken') || localStorage.getItem('token')
@@ -45,6 +46,19 @@ export default function BlogCard({ post, onEditBlog, onDeleteBlog, onBlogUpdated
   const [isSubmittingEdit, setIsSubmittingEdit] = useState(false)
 
   const [isDeletingBlog, setIsDeletingBlog] = useState(false)
+  const [blogAttachments, setBlogAttachments] = useState(post.attachments ?? [])
+
+  // Pending files for new comment
+  const [pendingCommentFiles, setPendingCommentFiles] = useState([])
+  const commentFileInputRef = useRef(null)
+
+  // Pending files for reply
+  const [pendingReplyFiles, setPendingReplyFiles] = useState([])
+  const replyFileInputRef = useRef(null)
+
+  // Pending files for edit
+  const [pendingEditFiles, setPendingEditFiles] = useState([])
+  const editFileInputRef = useRef(null)
 
   const currentUsername = localStorage.getItem('codesprintUsername')
   const currentUserId = localStorage.getItem('codesprintUserId')
@@ -57,7 +71,8 @@ export default function BlogCard({ post, onEditBlog, onDeleteBlog, onBlogUpdated
   useEffect(() => {
     setLikeCount(post.likeCount ?? 0)
     setIsLiked(Boolean(post.isLikedByCurrentUser))
-  }, [post.likeCount, post.isLikedByCurrentUser])
+    setBlogAttachments(post.attachments ?? [])
+  }, [post.likeCount, post.isLikedByCurrentUser, post.attachments])
 
   const fetchComments = async () => {
     if (!post.blogId) return
@@ -135,6 +150,29 @@ export default function BlogCard({ post, onEditBlog, onDeleteBlog, onBlogUpdated
     }
   }
 
+  const uploadFilesToComment = async (commentId, files) => {
+    if (!files || !files.length || !commentId) return
+    const token = localStorage.getItem('codesprintToken') || localStorage.getItem('token')
+    if (!token) return
+    const formData = new FormData()
+    files.forEach((f) => formData.append('files', f))
+    const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? ''
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/attachments/comment/${commentId}`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+        body: formData,
+      })
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}))
+        console.error('Comment attachment upload error:', errData)
+        alert(errData.message || 'Comment posted, but attachments failed to upload.')
+      }
+    } catch (err) {
+      console.error('Error uploading comment attachments:', err)
+    }
+  }
+
   const handleCommentSubmit = async (event) => {
     event.preventDefault()
     const trimmed = commentText.trim()
@@ -157,7 +195,13 @@ export default function BlogCard({ post, onEditBlog, onDeleteBlog, onBlogUpdated
       })
 
       if (res.ok) {
+        const newComment = await res.json().catch(() => null)
+        const newCommentId = newComment?.commentId
+        if (pendingCommentFiles.length && newCommentId) {
+          await uploadFilesToComment(newCommentId, pendingCommentFiles)
+        }
         setCommentText('')
+        setPendingCommentFiles([])
         await fetchComments()
         onBlogUpdated?.({ ...post, commentCount: (post.commentCount || 0) + 1 })
       } else {
@@ -194,7 +238,13 @@ export default function BlogCard({ post, onEditBlog, onDeleteBlog, onBlogUpdated
       })
 
       if (res.ok) {
+        const newReply = await res.json().catch(() => null)
+        const newReplyId = newReply?.commentId
+        if (pendingReplyFiles.length && newReplyId) {
+          await uploadFilesToComment(newReplyId, pendingReplyFiles)
+        }
         setReplyText('')
+        setPendingReplyFiles([])
         setActiveReplyId(null)
         await fetchComments()
         onBlogUpdated?.({ ...post, commentCount: (post.commentCount || 0) + 1 })
@@ -225,8 +275,12 @@ export default function BlogCard({ post, onEditBlog, onDeleteBlog, onBlogUpdated
       })
 
       if (res.ok) {
+        if (pendingEditFiles.length) {
+          await uploadFilesToComment(commentId, pendingEditFiles)
+        }
         setEditingCommentId(null)
         setEditCommentText('')
+        setPendingEditFiles([])
         await fetchComments()
       } else {
         const err = await res.json().catch(() => ({}))
@@ -279,7 +333,6 @@ export default function BlogCard({ post, onEditBlog, onDeleteBlog, onBlogUpdated
 
       if (res.ok) {
         const data = await res.json()
-        // Update comment state in the tree
         const updateTree = (list) =>
           list.map((c) => {
             if (c.commentId === commentId) {
@@ -372,6 +425,40 @@ export default function BlogCard({ post, onEditBlog, onDeleteBlog, onBlogUpdated
                   className="w-full rounded-xl border border-blue-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:ring-2 focus:ring-blue-400"
                   autoFocus
                 />
+                {/* File picker for edit */}
+                <div className="flex flex-wrap items-center gap-2">
+                  <input
+                    ref={editFileInputRef}
+                    type="file"
+                    multiple
+                    className="hidden"
+                    accept="image/*,.pdf,.txt,.md,.cpp,.c,.java,.py,.json,.zip"
+                    onChange={(e) => {
+                      const newFiles = Array.from(e.target.files || [])
+                      setPendingEditFiles((prev) => {
+                        const names = new Set(prev.map((f) => f.name))
+                        return [...prev, ...newFiles.filter((f) => !names.has(f.name))]
+                      })
+                      e.target.value = ''
+                    }}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => editFileInputRef.current?.click()}
+                    className="inline-flex items-center gap-1 rounded-full border border-violet-200 bg-violet-50 px-2.5 py-1 text-[11px] font-semibold text-violet-700 hover:bg-violet-100 transition-all"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48" />
+                    </svg>
+                    Attach
+                  </button>
+                  {pendingEditFiles.map((f) => (
+                    <span key={f.name} className="inline-flex items-center gap-1 rounded-full bg-violet-100 border border-violet-200 px-2 py-0.5 text-[10px] font-medium text-violet-700">
+                      <span className="max-w-[120px] truncate">{f.name}</span>
+                      <button type="button" onClick={() => setPendingEditFiles((p) => p.filter((x) => x !== f))} className="text-violet-400 hover:text-rose-500 font-bold">×</button>
+                    </span>
+                  ))}
+                </div>
                 <div className="flex gap-2">
                   <button
                     type="submit"
@@ -385,6 +472,7 @@ export default function BlogCard({ post, onEditBlog, onDeleteBlog, onBlogUpdated
                     onClick={() => {
                       setEditingCommentId(null)
                       setEditCommentText('')
+                      setPendingEditFiles([])
                     }}
                     className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-semibold text-slate-600 transition hover:bg-slate-100"
                   >
@@ -393,7 +481,23 @@ export default function BlogCard({ post, onEditBlog, onDeleteBlog, onBlogUpdated
                 </div>
               </form>
             ) : (
-              <p className="mt-1 text-slate-800 leading-relaxed">{comment.content || comment.text}</p>
+              <div>
+                <p className="mt-1 text-slate-800 leading-relaxed">{comment.content || comment.text}</p>
+                {/* Render comment attachments */}
+                {comment.attachments && comment.attachments.length > 0 && (
+                  <div className="mt-2">
+                    <AttachmentUploader
+                      entityType="comment"
+                      entityId={comment.commentId}
+                      attachments={comment.attachments}
+                      currentUsername={currentUsername}
+                      showUploadButton={false}
+                      onDeleted={() => fetchComments()}
+                      compact
+                    />
+                  </div>
+                )}
+              </div>
             )}
           </div>
 
@@ -425,6 +529,7 @@ export default function BlogCard({ post, onEditBlog, onDeleteBlog, onBlogUpdated
               onClick={() => {
                 setActiveReplyId((curr) => (curr === comment.commentId ? null : comment.commentId))
                 setReplyText('')
+                setPendingReplyFiles([])
               }}
               className="text-xs font-semibold text-blue-600 transition hover:text-blue-700 px-2 py-1 hover:bg-blue-50 rounded-lg"
             >
@@ -459,16 +564,16 @@ export default function BlogCard({ post, onEditBlog, onDeleteBlog, onBlogUpdated
         {/* Reply form and sub-replies */}
         <div className="mt-3 space-y-2 border-l-2 border-blue-100 pl-3">
           {isReplying && (
-            <form className="flex flex-col gap-2 sm:flex-row py-1" onSubmit={(e) => handleReplySubmit(e, comment.commentId)}>
-              <input
-                type="text"
-                value={replyText}
-                onChange={(e) => setReplyText(e.target.value)}
-                placeholder={`Reply to ${comment.authorUsername || 'author'}...`}
-                className="h-9 flex-1 rounded-xl border border-slate-200 bg-slate-50 px-3 text-xs text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-blue-400 focus:bg-white"
-                autoFocus
-              />
+            <form className="flex flex-col gap-2 py-1" onSubmit={(e) => handleReplySubmit(e, comment.commentId)}>
               <div className="flex gap-1.5">
+                <input
+                  type="text"
+                  value={replyText}
+                  onChange={(e) => setReplyText(e.target.value)}
+                  placeholder={`Reply to ${comment.authorUsername || 'author'}...`}
+                  className="h-9 flex-1 rounded-xl border border-slate-200 bg-slate-50 px-3 text-xs text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-blue-400 focus:bg-white"
+                  autoFocus
+                />
                 <button
                   type="submit"
                   disabled={isSubmittingReply}
@@ -478,11 +583,45 @@ export default function BlogCard({ post, onEditBlog, onDeleteBlog, onBlogUpdated
                 </button>
                 <button
                   type="button"
-                  onClick={() => setActiveReplyId(null)}
+                  onClick={() => { setActiveReplyId(null); setPendingReplyFiles([]) }}
                   className="inline-flex h-9 items-center justify-center rounded-xl border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-600 transition hover:bg-slate-100"
                 >
                   Cancel
                 </button>
+              </div>
+              {/* File picker for reply */}
+              <div className="flex flex-wrap items-center gap-2">
+                <input
+                  ref={replyFileInputRef}
+                  type="file"
+                  multiple
+                  className="hidden"
+                  accept="image/*,.pdf,.txt,.md,.cpp,.c,.java,.py,.json,.zip"
+                  onChange={(e) => {
+                    const newFiles = Array.from(e.target.files || [])
+                    setPendingReplyFiles((prev) => {
+                      const names = new Set(prev.map((f) => f.name))
+                      return [...prev, ...newFiles.filter((f) => !names.has(f.name))]
+                    })
+                    e.target.value = ''
+                  }}
+                />
+                <button
+                  type="button"
+                  onClick={() => replyFileInputRef.current?.click()}
+                  className="inline-flex items-center gap-1 rounded-full border border-violet-200 bg-violet-50 px-2.5 py-1 text-[11px] font-semibold text-violet-700 hover:bg-violet-100 transition-all"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48" />
+                  </svg>
+                  Attach
+                </button>
+                {pendingReplyFiles.map((f) => (
+                  <span key={f.name} className="inline-flex items-center gap-1 rounded-full bg-violet-100 border border-violet-200 px-2 py-0.5 text-[10px] font-medium text-violet-700">
+                    <span className="max-w-[120px] truncate">{f.name}</span>
+                    <button type="button" onClick={() => setPendingReplyFiles((p) => p.filter((x) => x !== f))} className="text-violet-400 hover:text-rose-500 font-bold">×</button>
+                  </span>
+                ))}
               </div>
             </form>
           )}
@@ -558,6 +697,20 @@ export default function BlogCard({ post, onEditBlog, onDeleteBlog, onBlogUpdated
           )}
         </div>
 
+        {/* Blog-level attachments rendering */}
+        {blogAttachments && blogAttachments.length > 0 && (
+          <div className="pt-1">
+            <AttachmentUploader
+              entityType="blog"
+              entityId={post.blogId}
+              attachments={blogAttachments}
+              currentUsername={currentUsername}
+              showUploadButton={false}
+              onDeleted={(id) => setBlogAttachments((prev) => prev.filter((a) => a.attachmentId !== id))}
+            />
+          </div>
+        )}
+
         {/* Action Buttons */}
         <div className="flex flex-wrap gap-3 pt-2">
           {/* Like Button */}
@@ -603,21 +756,57 @@ export default function BlogCard({ post, onEditBlog, onDeleteBlog, onBlogUpdated
           <div className="rounded-3xl border border-slate-200 bg-slate-50/80 p-5 mt-4 transition">
             <h3 className="text-base font-semibold text-slate-800 mb-3">Discussion ({comments.length})</h3>
 
-            <form className="flex flex-col gap-3 sm:flex-row" onSubmit={handleCommentSubmit}>
-              <input
-                type="text"
-                value={commentText}
-                onChange={(e) => setCommentText(e.target.value)}
-                placeholder="Share your thoughts on this post..."
-                className="h-11 flex-1 rounded-2xl border border-slate-200 bg-white px-4 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
-              />
-              <button
-                type="submit"
-                disabled={isSubmittingComment}
-                className="inline-flex h-11 items-center justify-center rounded-2xl bg-blue-600 px-6 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700 disabled:opacity-60"
-              >
-                {isSubmittingComment ? 'Posting...' : 'Post Comment'}
-              </button>
+            <form className="flex flex-col gap-2" onSubmit={handleCommentSubmit}>
+              <div className="flex gap-3">
+                <input
+                  type="text"
+                  value={commentText}
+                  onChange={(e) => setCommentText(e.target.value)}
+                  placeholder="Share your thoughts on this post..."
+                  className="h-11 flex-1 rounded-2xl border border-slate-200 bg-white px-4 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
+                />
+                <button
+                  type="submit"
+                  disabled={isSubmittingComment}
+                  className="inline-flex h-11 items-center justify-center rounded-2xl bg-blue-600 px-6 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700 disabled:opacity-60"
+                >
+                  {isSubmittingComment ? 'Posting...' : 'Post'}
+                </button>
+              </div>
+              {/* Attach button row */}
+              <div className="flex flex-wrap items-center gap-2 pl-1">
+                <input
+                  ref={commentFileInputRef}
+                  type="file"
+                  multiple
+                  className="hidden"
+                  accept="image/*,.pdf,.txt,.md,.cpp,.c,.java,.py,.json,.zip"
+                  onChange={(e) => {
+                    const newFiles = Array.from(e.target.files || [])
+                    setPendingCommentFiles((prev) => {
+                      const names = new Set(prev.map((f) => f.name))
+                      return [...prev, ...newFiles.filter((f) => !names.has(f.name))]
+                    })
+                    e.target.value = ''
+                  }}
+                />
+                <button
+                  type="button"
+                  onClick={() => commentFileInputRef.current?.click()}
+                  className="inline-flex items-center gap-1.5 rounded-full border border-violet-200 bg-violet-50 px-3 py-1 text-xs font-semibold text-violet-700 hover:bg-violet-100 hover:border-violet-300 transition-all"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48" />
+                  </svg>
+                  Attach
+                </button>
+                {pendingCommentFiles.map((f) => (
+                  <span key={f.name} className="inline-flex items-center gap-1 rounded-full bg-violet-100 border border-violet-200 px-2.5 py-0.5 text-[11px] font-medium text-violet-700">
+                    <span className="max-w-[120px] truncate">{f.name}</span>
+                    <button type="button" onClick={() => setPendingCommentFiles((p) => p.filter((x) => x !== f))} className="text-violet-400 hover:text-rose-500 font-bold">×</button>
+                  </span>
+                ))}
+              </div>
             </form>
 
             <div className="mt-5 space-y-3">
