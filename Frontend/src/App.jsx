@@ -30,7 +30,7 @@ export default function App(props) {
             if (!grouped[topic]) {
               grouped[topic] = []
             }
-            // Avoid duplicate by ID xyz
+            // Avoid duplicate by ID xyz test
             if (!grouped[topic].find(ex => ex.id === p.problemId)) {
               grouped[topic].push({
                 id: p.problemId,
