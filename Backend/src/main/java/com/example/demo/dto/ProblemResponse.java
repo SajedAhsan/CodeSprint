@@ -1,7 +1,6 @@
 package com.example.demo.dto;
 
 import java.time.LocalDateTime;
-import com.example.demo.dto.EditorialResponse;
 
 public class ProblemResponse {
 
