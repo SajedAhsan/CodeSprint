@@ -6,6 +6,7 @@ import com.example.demo.dto.AuthResponse;
 import com.example.demo.dto.LoginRequest;
 import com.example.demo.dto.RegisterRequest;
 import com.example.demo.security.JwtService;
+import com.example.demo.security.TokenBlacklistService;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -18,11 +19,14 @@ public class AuthService {
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
     private final JwtService jwtService;
+    private final TokenBlacklistService tokenBlacklistService;
 
-    public AuthService(UserRepository userRepository, PasswordEncoder passwordEncoder, JwtService jwtService) {
+    public AuthService(UserRepository userRepository, PasswordEncoder passwordEncoder,
+                       JwtService jwtService, TokenBlacklistService tokenBlacklistService) {
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
         this.jwtService = jwtService;
+        this.tokenBlacklistService = tokenBlacklistService;
     }
 
     @Transactional
@@ -62,4 +66,16 @@ public class AuthService {
             user.getUserId(),
             user.getUsername());
     }
-}
+
+    /**
+     * Invalidates the supplied JWT token so that it cannot be reused
+     * even before it naturally expires.
+     *
+     * @param token raw JWT value extracted from the Authorization header
+     */
+    public void logout(String token) {
+        if (token != null && !token.isBlank()) {
+            tokenBlacklistService.blacklist(token);
+        }
+    }
+}

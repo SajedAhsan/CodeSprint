@@ -12,5 +12,6 @@ public interface EditorialSolutionRepository extends JpaRepository<EditorialSolu
     List<EditorialSolution> findByEditorialId(@Param("editorialId") Integer editorialId);
 
     @Query("SELECT s FROM EditorialSolution s WHERE s.editorial.editorialId = :editorialId AND LOWER(s.language) = LOWER(:language)")
-    List<EditorialSolution> findByEditorialIdAndLanguage(@Param("editorialId") Integer editorialId, @Param("language") String language);
+    List<EditorialSolution> findByEditorialIdAndLanguage(@Param("editorialId") Integer editorialId,
+            @Param("language") String language);
 }

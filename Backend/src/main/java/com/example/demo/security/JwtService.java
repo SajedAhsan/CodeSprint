@@ -50,6 +50,14 @@ public class JwtService {
         }
     }
 
+    public Date extractExpiration(String token) {
+        try {
+            return extractAllClaims(token).getExpiration();
+        } catch (Exception ex) {
+            return null;
+        }
+    }
+
     private Claims extractAllClaims(String token) {
         return Jwts.parser()
                 .verifyWith(getSigningKey())

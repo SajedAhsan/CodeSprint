@@ -1,10 +1,24 @@
-export default function AdminNavbar({ currentSection, onSwitchSection, onExitAdmin, onNavigateBlog }) {
+export default function AdminNavbar({ currentSection, onSwitchSection, onExitAdmin, onNavigateBlog, onLogout }) {
   const sections = [
     { key: 'composer', label: 'Problem Composer' },
     { key: 'registry', label: 'Problem Registry' },
     { key: 'posts', label: 'Blog Manager' },
     { key: 'preview', label: 'Preview' },
   ]
+
+  const handleLogout = () => {
+    if (typeof onLogout === 'function') {
+      onLogout()
+    } else {
+      localStorage.removeItem('codesprintToken')
+      localStorage.removeItem('token')
+      localStorage.removeItem('codesprintUsername')
+      localStorage.removeItem('codesprintUserId')
+      localStorage.removeItem('codesprintRole')
+      localStorage.removeItem('codesprint_current_view')
+      window.location.href = '/'
+    }
+  }
 
   return (
     <header className="sticky top-0 z-30 border-b border-slate-200/80 bg-slate-950/85 backdrop-blur-xl">
@@ -46,6 +60,29 @@ export default function AdminNavbar({ currentSection, onSwitchSection, onExitAdm
             className="rounded-full bg-cyan-400 px-4 py-2 text-sm font-semibold text-slate-950 transition hover:bg-cyan-300"
           >
             Feed
+          </button>
+          <button
+            type="button"
+            onClick={handleLogout}
+            className="inline-flex items-center gap-1.5 rounded-full border border-rose-500/40 bg-rose-500/15 px-3.5 py-2 text-sm font-semibold text-rose-300 transition hover:border-rose-500 hover:bg-rose-600 hover:text-white focus:outline-none focus:ring-2 focus:ring-rose-500 focus:ring-offset-1 focus:ring-offset-slate-950 active:scale-95 cursor-pointer"
+            aria-label="Logout"
+            title="Logout"
+          >
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              className="h-4 w-4"
+              aria-hidden="true"
+            >
+              <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+              <polyline points="16 17 21 12 16 7" />
+              <line x1="21" y1="12" x2="9" y2="12" />
+            </svg>
+            <span>Logout</span>
           </button>
         </div>
       </div>

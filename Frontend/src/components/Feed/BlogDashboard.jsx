@@ -19,6 +19,7 @@ export default function BlogDashboard({
   onNavigateProfile,
   onNavigateRoadmap,
   onEditBlog,
+  onLogout,
 }) {
   const [blogs, setBlogs] = useState([])
   const [isLoading, setIsLoading] = useState(true)
@@ -97,6 +98,7 @@ export default function BlogDashboard({
         onNavigatePostBlog={onNavigatePostBlog}
         onNavigateProfile={onNavigateProfile}
         onNavigateRoadmap={onNavigateRoadmap}
+        onLogout={onLogout}
       />
 
       {/* Hero Banner */}

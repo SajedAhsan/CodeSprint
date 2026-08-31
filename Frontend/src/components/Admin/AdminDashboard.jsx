@@ -21,6 +21,7 @@ function StatCard({ label, value, hint }) {
 export default function AdminDashboard({
   onBackToLanding,
   onNavigateBlog,
+  onLogout,
   problemsByTopic,
   setProblemsByTopic,
 }) {
@@ -313,6 +314,7 @@ export default function AdminDashboard({
         onSwitchSection={setCurrentSection}
         onExitAdmin={onBackToLanding}
         onNavigateBlog={onNavigateBlog}
+        onLogout={onLogout}
       />
 
       <section className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8 lg:py-10">

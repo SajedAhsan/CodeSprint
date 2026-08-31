@@ -98,8 +98,7 @@ public class AttachmentJdbcRepository {
                     AttachmentResponse att = mapRowToAttachment(rs);
                     map.computeIfAbsent(bId, k -> new ArrayList<>()).add(att);
                 },
-                blogIds.toArray()
-        );
+                blogIds.toArray());
 
         return map;
     }
@@ -179,8 +178,7 @@ public class AttachmentJdbcRepository {
                     AttachmentResponse att = mapRowToAttachment(rs);
                     map.computeIfAbsent(cId, k -> new ArrayList<>()).add(att);
                 },
-                commentIds.toArray()
-        );
+                commentIds.toArray());
 
         return map;
     }
@@ -240,8 +238,7 @@ public class AttachmentJdbcRepository {
                     AttachmentResponse att = mapRowToAttachment(rs);
                     map.computeIfAbsent(dId, k -> new ArrayList<>()).add(att);
                 },
-                discussionIds.toArray()
-        );
+                discussionIds.toArray());
 
         return map;
     }
@@ -265,7 +262,6 @@ public class AttachmentJdbcRepository {
                 filetype,
                 fileUrl,
                 downloadUrl,
-                uploadedTs != null ? uploadedTs.toLocalDateTime() : null
-        );
+                uploadedTs != null ? uploadedTs.toLocalDateTime() : null);
     }
 }

@@ -111,6 +111,37 @@ export default function App(props) {
     navigate(nextRole === 'admin' ? 'admin' : 'feed')
   }
 
+  const handleLogout = async () => {
+    const token = localStorage.getItem('codesprintToken') || localStorage.getItem('token')
+
+    // Notify the backend to blacklist the token (fire-and-forget, don't block UI)
+    if (token) {
+      try {
+        const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? ''
+        await fetch(`${API_BASE_URL}/api/auth/logout`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+          },
+        })
+      } catch (_) {
+        // Silently ignore network errors — local logout still proceeds
+      }
+    }
+
+    // Clear all local auth state
+    localStorage.removeItem('codesprintToken')
+    localStorage.removeItem('token')
+    localStorage.removeItem('codesprintUsername')
+    localStorage.removeItem('codesprintUserId')
+    localStorage.removeItem('codesprintRole')
+    localStorage.removeItem('codesprint_current_view')
+
+    // Redirect to the login page
+    navigate('auth', true)
+  }
+
   const handleNavigatePostBlog = () => {
     setEditingBlog(null)
     navigate('post-blog')
@@ -135,6 +166,7 @@ export default function App(props) {
     return (
       <AdminDashboard
         onBackToLanding={() => navigate('landing')}
+        onLogout={handleLogout}
         onNavigateProblems={() => navigate('problems')}
         onNavigateBlog={() => navigate('feed')}
         onNavigatePostBlog={handleNavigatePostBlog}
@@ -153,6 +185,7 @@ export default function App(props) {
     return (
       <BlogDashboard
         onBackToLanding={() => navigate('landing')}
+        onLogout={handleLogout}
         onNavigateProblems={() => navigate('problems')}
         onNavigateBlog={() => navigate('feed')}
         onNavigatePostBlog={handleNavigatePostBlog}
@@ -169,6 +202,7 @@ export default function App(props) {
     return (
       <ProblemsPage
         onBackToFeed={() => navigate('feed')}
+        onLogout={handleLogout}
         onNavigateProblems={() => navigate('problems')}
         onNavigateBlog={() => navigate('feed')}
         onNavigatePostBlog={handleNavigatePostBlog}
@@ -185,6 +219,7 @@ export default function App(props) {
     return (
       <BlogPostPage
         onBackToFeed={() => navigate('feed')}
+        onLogout={handleLogout}
         onNavigateProblems={() => navigate('problems')}
         onNavigateBlog={() => navigate('feed')}
         onNavigatePostBlog={handleNavigatePostBlog}
@@ -201,6 +236,7 @@ export default function App(props) {
     return (
       <ProfilePage
         onBackToFeed={() => navigate('feed')}
+        onLogout={handleLogout}
         onNavigateProblems={() => navigate('problems')}
         onNavigateBlog={() => navigate('feed')}
         onNavigatePostBlog={handleNavigatePostBlog}
@@ -215,6 +251,7 @@ export default function App(props) {
   if (view === 'roadmap') {
     return (
       <RoadmapPage
+        onLogout={handleLogout}
         onNavigateBlog={() => navigate('feed')}
         onNavigateProblems={() => navigate('problems')}
         onNavigatePostBlog={handleNavigatePostBlog}

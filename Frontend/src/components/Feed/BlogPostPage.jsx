@@ -41,6 +41,7 @@ export default function BlogPostPage({
   onNavigatePostBlog,
   onNavigateProfile,
   onNavigateRoadmap,
+  onLogout,
   editingBlog = null,
   onBlogSaved,
 }) {
@@ -200,6 +201,7 @@ export default function BlogPostPage({
         onNavigatePostBlog={onNavigatePostBlog}
         onNavigateProfile={onNavigateProfile}
         onNavigateRoadmap={onNavigateRoadmap}
+        onLogout={onLogout}
       />
 
       <section className="mx-auto max-w-5xl px-4 py-8 sm:px-6 lg:px-8 lg:py-10">

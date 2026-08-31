@@ -237,6 +237,7 @@ export default function RoadmapPage({
   onNavigatePostBlog,
   onNavigateProfile,
   onNavigateRoadmap,
+  onLogout,
 }) {
   const [activeRoadmapId, setActiveRoadmapId] = useState('roadmap1')
   const [selectedTopic, setSelectedTopic] = useState(null)
@@ -273,6 +274,7 @@ export default function RoadmapPage({
         onNavigatePostBlog={onNavigatePostBlog}
         onNavigateProfile={onNavigateProfile}
         onNavigateRoadmap={onNavigateRoadmap}
+        onLogout={onLogout}
       />
 
       {/* Top Controls: Roadmap Tabs & Overall Progress */}

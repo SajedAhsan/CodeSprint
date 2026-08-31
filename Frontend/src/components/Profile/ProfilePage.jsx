@@ -81,7 +81,14 @@ function OverallProgressChart({ easy, medium, hard }) {
 /* ════════════════════════════════════════════════════════════
    Main Profile Page
 ════════════════════════════════════════════════════════════ */
-export default function ProfilePage({ onNavigateBlog, onNavigateProblems, onNavigatePostBlog, onNavigateProfile, onNavigateRoadmap }) {
+export default function ProfilePage({
+  onNavigateBlog,
+  onNavigateProblems,
+  onNavigatePostBlog,
+  onNavigateProfile,
+  onNavigateRoadmap,
+  onLogout,
+}) {
   const user = {
     name: 'Rahul',
     handle: '@rahul_codes',
@@ -104,6 +111,7 @@ export default function ProfilePage({ onNavigateBlog, onNavigateProblems, onNavi
         onNavigatePostBlog={onNavigatePostBlog}
         onNavigateProfile={onNavigateProfile}
         onNavigateRoadmap={onNavigateRoadmap}
+        onLogout={onLogout}
       />
 
       <section className="mx-auto max-w-[1200px] px-4 py-8 sm:px-6 lg:px-8">
