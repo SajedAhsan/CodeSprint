@@ -13,7 +13,8 @@ import java.util.Optional;
 @Repository
 public interface BlogAttachmentRepository extends JpaRepository<BlogAttachment, Integer> {
 
-    List<BlogAttachment> findByBlog_BlogId(Integer blogId);
+    @Query("SELECT ba FROM BlogAttachment ba WHERE ba.blog.blogId = :blogId")
+    List<BlogAttachment> findByBlog_BlogId(@Param("blogId") Integer blogId);
 
     @Query("SELECT ba.attachmentId FROM BlogAttachment ba WHERE ba.blog.blogId = :blogId")
     List<Integer> findAttachmentIdsByBlogId(@Param("blogId") Integer blogId);
@@ -26,5 +27,6 @@ public interface BlogAttachmentRepository extends JpaRepository<BlogAttachment, 
     @Query("DELETE FROM BlogAttachment ba WHERE ba.attachmentId = :attachmentId")
     void deleteByAttachmentId(@Param("attachmentId") Integer attachmentId);
 
-    Optional<BlogAttachment> findByAttachment_AttachmentId(Integer attachmentId);
+    @Query("SELECT ba FROM BlogAttachment ba WHERE ba.attachmentId = :attachmentId")
+    Optional<BlogAttachment> findByAttachment_AttachmentId(@Param("attachmentId") Integer attachmentId);
 }

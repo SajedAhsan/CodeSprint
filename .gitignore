@@ -52,6 +52,13 @@ pnpm-debug.log*
 .env.local
 !.env.example
 
+# Spring / backend properties and secrets
+application.properties
+application-*.properties
+application.property
+application*.yml
+application*.yaml
+
 #########################
 # IDEs, editors, OS
 #########################

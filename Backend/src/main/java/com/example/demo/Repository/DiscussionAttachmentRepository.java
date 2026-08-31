@@ -13,7 +13,8 @@ import java.util.Optional;
 @Repository
 public interface DiscussionAttachmentRepository extends JpaRepository<DiscussionAttachment, Integer> {
 
-    List<DiscussionAttachment> findByDiscussion_DiscussionId(Integer discussionId);
+    @Query("SELECT da FROM DiscussionAttachment da WHERE da.discussion.discussionId = :discussionId")
+    List<DiscussionAttachment> findByDiscussion_DiscussionId(@Param("discussionId") Integer discussionId);
 
     @Query("SELECT da.attachmentId FROM DiscussionAttachment da WHERE da.discussion.discussionId = :discussionId")
     List<Integer> findAttachmentIdsByDiscussionId(@Param("discussionId") Integer discussionId);
@@ -26,5 +27,6 @@ public interface DiscussionAttachmentRepository extends JpaRepository<Discussion
     @Query("DELETE FROM DiscussionAttachment da WHERE da.attachmentId = :attachmentId")
     void deleteByAttachmentId(@Param("attachmentId") Integer attachmentId);
 
-    Optional<DiscussionAttachment> findByAttachment_AttachmentId(Integer attachmentId);
+    @Query("SELECT da FROM DiscussionAttachment da WHERE da.attachmentId = :attachmentId")
+    Optional<DiscussionAttachment> findByAttachment_AttachmentId(@Param("attachmentId") Integer attachmentId);
 }

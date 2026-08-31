@@ -26,8 +26,7 @@ public class FileStorageService {
     private static final long MAX_FILE_SIZE = 15 * 1024 * 1024; // 15MB
 
     private static final Set<String> BLOCKED_EXTENSIONS = new HashSet<>(Arrays.asList(
-            "exe", "bat", "cmd", "sh", "php", "php3", "phtml", "jsp", "asp", "aspx", "dll", "scr", "vbs", "jar"
-    ));
+            "exe", "bat", "cmd", "sh", "php", "php3", "phtml", "jsp", "asp", "aspx", "dll", "scr", "vbs", "jar"));
 
     public FileStorageService(@Value("${app.upload.dir:uploads/attachments}") String uploadDir) {
         this.fileStorageLocation = Paths.get(uploadDir).toAbsolutePath().normalize();
@@ -38,7 +37,8 @@ public class FileStorageService {
         try {
             Files.createDirectories(this.fileStorageLocation);
         } catch (Exception ex) {
-            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Could not create upload directory: " + ex.getMessage());
+            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR,
+                    "Could not create upload directory: " + ex.getMessage());
         }
     }
 
@@ -58,18 +58,17 @@ public class FileStorageService {
 
         String cleanedOriginalFilename = StringUtils.cleanPath(rawOriginalFilename);
 
-        // Prevent path traversal
-        if (cleanedOriginalFilename.contains("..") || cleanedOriginalFilename.contains("/") || cleanedOriginalFilename.contains("\\")) {
+        if (cleanedOriginalFilename.contains("..") || cleanedOriginalFilename.contains("/")
+                || cleanedOriginalFilename.contains("\\")) {
             cleanedOriginalFilename = Paths.get(cleanedOriginalFilename).getFileName().toString();
         }
 
-        // Sanitize characters
         cleanedOriginalFilename = cleanedOriginalFilename.replaceAll("[^a-zA-Z0-9._-]", "_");
 
-        // Validate extension
         String extension = getFileExtension(cleanedOriginalFilename).toLowerCase();
         if (BLOCKED_EXTENSIONS.contains(extension)) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "File extension '." + extension + "' is not permitted");
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "File extension '." + extension + "' is not permitted");
         }
 
         String uniqueFileName = UUID.randomUUID().toString() + "_" + cleanedOriginalFilename;
@@ -92,7 +91,8 @@ public class FileStorageService {
 
             return new StoredFileInfo(cleanedOriginalFilename, uniqueFileName, fileUrl, contentType, file.getSize());
         } catch (IOException ex) {
-            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Could not store file: " + ex.getMessage());
+            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR,
+                    "Could not store file: " + ex.getMessage());
         }
     }
 
@@ -107,7 +107,8 @@ public class FileStorageService {
             if (resource.exists() && resource.isReadable()) {
                 return resource;
             } else {
-                throw new ResponseStatusException(HttpStatus.NOT_FOUND, "File not found or cannot be read: " + fileName);
+                throw new ResponseStatusException(HttpStatus.NOT_FOUND,
+                        "File not found or cannot be read: " + fileName);
             }
         } catch (MalformedURLException ex) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "File not found: " + fileName);
@@ -115,20 +116,21 @@ public class FileStorageService {
     }
 
     public void deleteFile(String fileName) {
-        if (fileName == null || fileName.isBlank()) return;
+        if (fileName == null || fileName.isBlank())
+            return;
         try {
             Path filePath = this.fileStorageLocation.resolve(fileName).normalize();
             if (filePath.startsWith(this.fileStorageLocation)) {
                 Files.deleteIfExists(filePath);
             }
         } catch (IOException ex) {
-            // Log & continue — do not block DB deletion
             System.err.println("Warning: failed to delete file from disk: " + fileName + " (" + ex.getMessage() + ")");
         }
     }
 
     public static String extractStoredFileName(String fileUrl) {
-        if (fileUrl == null) return null;
+        if (fileUrl == null)
+            return null;
         int lastSlash = fileUrl.lastIndexOf('/');
         return lastSlash >= 0 ? fileUrl.substring(lastSlash + 1) : fileUrl;
     }
@@ -163,7 +165,8 @@ public class FileStorageService {
         private final String contentType;
         private final long size;
 
-        public StoredFileInfo(String originalFilename, String storedFilename, String fileUrl, String contentType, long size) {
+        public StoredFileInfo(String originalFilename, String storedFilename, String fileUrl, String contentType,
+                long size) {
             this.originalFilename = originalFilename;
             this.storedFilename = storedFilename;
             this.fileUrl = fileUrl;

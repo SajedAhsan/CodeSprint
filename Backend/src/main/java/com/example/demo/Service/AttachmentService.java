@@ -49,7 +49,8 @@ public class AttachmentService {
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "User must be authenticated");
         }
         return userRepository.findUserByUsername(username.trim())
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Authenticated user not found"));
+                .orElseThrow(
+                        () -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Authenticated user not found"));
     }
 
     private boolean isAdmin(User user) {
@@ -60,10 +61,12 @@ public class AttachmentService {
     public List<AttachmentResponse> uploadBlogAttachments(Integer blogId, MultipartFile[] files, String username) {
         User user = getAuthenticatedUser(username);
         Blog blog = blogRepository.findById(blogId)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Blog not found with id: " + blogId));
+                .orElseThrow(
+                        () -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Blog not found with id: " + blogId));
 
         if (!blog.getUser().getUserId().equals(user.getUserId()) && !isAdmin(user)) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "You do not have permission to attach files to this blog");
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN,
+                    "You do not have permission to attach files to this blog");
         }
 
         if (files == null || files.length == 0) {
@@ -72,7 +75,8 @@ public class AttachmentService {
 
         List<AttachmentResponse> responses = new ArrayList<>();
         for (MultipartFile file : files) {
-            if (file == null || file.isEmpty()) continue;
+            if (file == null || file.isEmpty())
+                continue;
 
             FileStorageService.StoredFileInfo info = fileStorageService.storeFile(file);
 
@@ -93,13 +97,16 @@ public class AttachmentService {
     }
 
     @Transactional
-    public List<AttachmentResponse> uploadDiscussionAttachments(Integer discussionId, MultipartFile[] files, String username) {
+    public List<AttachmentResponse> uploadDiscussionAttachments(Integer discussionId, MultipartFile[] files,
+            String username) {
         User user = getAuthenticatedUser(username);
         Discussion discussion = discussionRepository.findById(discussionId)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Discussion not found with id: " + discussionId));
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
+                        "Discussion not found with id: " + discussionId));
 
         if (!discussion.getUser().getUserId().equals(user.getUserId()) && !isAdmin(user)) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "You do not have permission to attach files to this discussion");
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN,
+                    "You do not have permission to attach files to this discussion");
         }
 
         if (files == null || files.length == 0) {
@@ -108,7 +115,8 @@ public class AttachmentService {
 
         List<AttachmentResponse> responses = new ArrayList<>();
         for (MultipartFile file : files) {
-            if (file == null || file.isEmpty()) continue;
+            if (file == null || file.isEmpty())
+                continue;
 
             FileStorageService.StoredFileInfo info = fileStorageService.storeFile(file);
 
@@ -120,7 +128,8 @@ public class AttachmentService {
             attachment.setUploadedAt(LocalDateTime.now());
 
             Attachment savedAttachment = attachmentRepository.saveAndFlush(attachment);
-            attachmentJdbcRepository.linkAttachmentToDiscussion(savedAttachment.getAttachmentId(), discussion.getDiscussionId());
+            attachmentJdbcRepository.linkAttachmentToDiscussion(savedAttachment.getAttachmentId(),
+                    discussion.getDiscussionId());
 
             responses.add(toResponse(savedAttachment));
         }
@@ -129,13 +138,16 @@ public class AttachmentService {
     }
 
     @Transactional
-    public List<AttachmentResponse> uploadEditorialAttachments(Integer editorialId, MultipartFile[] files, String username) {
+    public List<AttachmentResponse> uploadEditorialAttachments(Integer editorialId, MultipartFile[] files,
+            String username) {
         User user = getAuthenticatedUser(username);
         Editorial editorial = editorialRepository.findById(editorialId)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Editorial not found with id: " + editorialId));
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
+                        "Editorial not found with id: " + editorialId));
 
         if (!isAdmin(user)) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Only administrators can attach files to editorials");
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN,
+                    "Only administrators can attach files to editorials");
         }
 
         if (files == null || files.length == 0) {
@@ -144,7 +156,8 @@ public class AttachmentService {
 
         List<AttachmentResponse> responses = new ArrayList<>();
         for (MultipartFile file : files) {
-            if (file == null || file.isEmpty()) continue;
+            if (file == null || file.isEmpty())
+                continue;
 
             FileStorageService.StoredFileInfo info = fileStorageService.storeFile(file);
 
@@ -156,7 +169,8 @@ public class AttachmentService {
             attachment.setUploadedAt(LocalDateTime.now());
 
             Attachment savedAttachment = attachmentRepository.saveAndFlush(attachment);
-            attachmentJdbcRepository.linkAttachmentToEditorial(savedAttachment.getAttachmentId(), editorial.getEditorialId());
+            attachmentJdbcRepository.linkAttachmentToEditorial(savedAttachment.getAttachmentId(),
+                    editorial.getEditorialId());
 
             responses.add(toResponse(savedAttachment));
         }
@@ -165,13 +179,16 @@ public class AttachmentService {
     }
 
     @Transactional
-    public List<AttachmentResponse> uploadCommentAttachments(Integer commentId, MultipartFile[] files, String username) {
+    public List<AttachmentResponse> uploadCommentAttachments(Integer commentId, MultipartFile[] files,
+            String username) {
         User user = getAuthenticatedUser(username);
         Comment comment = commentRepository.findById(commentId)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Comment not found with id: " + commentId));
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
+                        "Comment not found with id: " + commentId));
 
         if (!comment.getUser().getUserId().equals(user.getUserId()) && !isAdmin(user)) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "You do not have permission to attach files to this comment");
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN,
+                    "You do not have permission to attach files to this comment");
         }
 
         if (files == null || files.length == 0) {
@@ -180,7 +197,8 @@ public class AttachmentService {
 
         List<AttachmentResponse> responses = new ArrayList<>();
         for (MultipartFile file : files) {
-            if (file == null || file.isEmpty()) continue;
+            if (file == null || file.isEmpty())
+                continue;
 
             FileStorageService.StoredFileInfo info = fileStorageService.storeFile(file);
 
@@ -223,33 +241,32 @@ public class AttachmentService {
     @Transactional(readOnly = true)
     public Attachment getAttachmentById(Integer attachmentId) {
         return attachmentRepository.findById(attachmentId)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Attachment not found with id: " + attachmentId));
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
+                        "Attachment not found with id: " + attachmentId));
     }
 
     @Transactional
     public void deleteAttachment(Integer attachmentId, String username) {
         User user = getAuthenticatedUser(username);
         Attachment attachment = attachmentRepository.findById(attachmentId)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Attachment not found with id: " + attachmentId));
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
+                        "Attachment not found with id: " + attachmentId));
 
         boolean isOwner = attachment.getUser().getUserId().equals(user.getUserId());
         if (!isOwner && !isAdmin(user)) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "You do not have permission to delete this attachment");
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN,
+                    "You do not have permission to delete this attachment");
         }
 
-        // Delete relations from all link tables
         attachmentJdbcRepository.deleteLinksByAttachmentId(attachmentId);
-
-        // Delete physical file
         String storedFileName = FileStorageService.extractStoredFileName(attachment.getFileUrl());
         fileStorageService.deleteFile(storedFileName);
-
-        // Delete attachment entity
         attachmentRepository.delete(attachment);
     }
 
     public AttachmentResponse toResponse(Attachment a) {
-        if (a == null) return null;
+        if (a == null)
+            return null;
         return new AttachmentResponse(
                 a.getAttachmentId(),
                 a.getUser() != null ? a.getUser().getUserId() : null,
@@ -258,7 +275,6 @@ public class AttachmentService {
                 a.getFiletype(),
                 a.getFileUrl(),
                 "/api/attachments/" + a.getAttachmentId() + "/download",
-                a.getUploadedAt()
-        );
+                a.getUploadedAt());
     }
 }

@@ -46,7 +46,8 @@ public class DiscussionService {
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "User must be authenticated");
         }
         return userRepository.findUserByUsername(username.trim())
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Authenticated user not found"));
+                .orElseThrow(
+                        () -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Authenticated user not found"));
     }
 
     private Integer getUserIdOrNull(String username) {
@@ -63,7 +64,8 @@ public class DiscussionService {
         User user = getAuthenticatedUser(username);
 
         Problem problem = problemRepository.findProblemById(problemId)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Problem not found with id: " + problemId));
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
+                        "Problem not found with id: " + problemId));
 
         Discussion discussion = new Discussion();
         discussion.setUser(user);
@@ -82,14 +84,14 @@ public class DiscussionService {
                 savedDiscussion.getUpdatedAt(),
                 0L,
                 0L,
-                false
-        );
+                false);
     }
 
     @Transactional(readOnly = true)
     public List<DiscussionResponse> getDiscussionsByProblem(Integer problemId, String username) {
         problemRepository.findProblemById(problemId)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Problem not found with id: " + problemId));
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
+                        "Problem not found with id: " + problemId));
 
         Integer currentUserId = getUserIdOrNull(username);
         return discussionJdbcRepository.findDiscussionsByProblemId(problemId, currentUserId);
@@ -98,7 +100,8 @@ public class DiscussionService {
     @Transactional(readOnly = true)
     public List<DiscussionDetailResponse> getDiscussionsWithDetailsByProblem(Integer problemId, String username) {
         problemRepository.findProblemById(problemId)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Problem not found with id: " + problemId));
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
+                        "Problem not found with id: " + problemId));
 
         Integer currentUserId = getUserIdOrNull(username);
         return discussionJdbcRepository.findDiscussionsWithDetailsByProblemId(problemId, currentUserId);
@@ -110,7 +113,8 @@ public class DiscussionService {
 
         DiscussionResponse discussionSummary = discussionJdbcRepository
                 .findDiscussionSummaryById(discussionId, currentUserId)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Discussion not found with id: " + discussionId));
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
+                        "Discussion not found with id: " + discussionId));
 
         List<CommentResponse> nestedComments = discussionJdbcRepository.findNestedCommentsByDiscussionId(discussionId);
 
@@ -122,10 +126,12 @@ public class DiscussionService {
         User user = getAuthenticatedUser(username);
 
         Discussion discussion = discussionRepository.findById(discussionId)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Discussion not found with id: " + discussionId));
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
+                        "Discussion not found with id: " + discussionId));
 
         if (!discussion.getUser().getUserId().equals(user.getUserId())) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "You do not have permission to update this discussion");
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN,
+                    "You do not have permission to update this discussion");
         }
 
         discussion.setContent(request.getContent().trim());
@@ -133,7 +139,8 @@ public class DiscussionService {
 
         return discussionJdbcRepository
                 .findDiscussionSummaryById(discussionId, user.getUserId())
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Failed to retrieve updated discussion"));
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR,
+                        "Failed to retrieve updated discussion"));
     }
 
     @Transactional
@@ -141,31 +148,28 @@ public class DiscussionService {
         User user = getAuthenticatedUser(username);
 
         Discussion discussion = discussionRepository.findById(discussionId)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Discussion not found with id: " + discussionId));
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
+                        "Discussion not found with id: " + discussionId));
 
         boolean isOwner = discussion.getUser().getUserId().equals(user.getUserId());
         boolean isAdmin = user.getRole() != null && user.getRole().toUpperCase().contains("ADMIN");
 
         if (!isOwner && !isAdmin) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "You do not have permission to delete this discussion");
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN,
+                    "You do not have permission to delete this discussion");
         }
 
-        // Delete associated reactions
         discussionReactionRepository.deleteByDiscussionId(discussionId);
 
-        // Find comment IDs associated with this discussion
         List<Integer> commentIds = discussionCommentRepository.findCommentIdsByDiscussionId(discussionId);
 
-        // Delete discussion_comment mappings
         discussionCommentRepository.deleteByDiscussionId(discussionId);
 
-        // Delete comment reactions
         if (!commentIds.isEmpty()) {
             commentReactionRepository.deleteByCommentIdIn(commentIds);
             deleteCommentsHierarchy(commentIds);
         }
 
-        // Delete discussion
         discussionRepository.delete(discussion);
     }
 
@@ -174,19 +178,23 @@ public class DiscussionService {
         User user = getAuthenticatedUser(username);
 
         Discussion discussion = discussionRepository.findById(discussionId)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Discussion not found with id: " + discussionId));
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
+                        "Discussion not found with id: " + discussionId));
 
         Comment parentComment = null;
         if (request.getParentCommentId() != null) {
             parentComment = commentRepository.findById(request.getParentCommentId())
-                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Parent comment not found with id: " + request.getParentCommentId()));
+                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
+                            "Parent comment not found with id: " + request.getParentCommentId()));
 
-            // Verify parent comment belongs to the same discussion
-            DiscussionComment parentDc = discussionCommentRepository.findByComment_CommentId(parentComment.getCommentId())
-                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "Parent comment does not belong to this discussion"));
+            DiscussionComment parentDc = discussionCommentRepository
+                    .findByComment_CommentId(parentComment.getCommentId())
+                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                            "Parent comment does not belong to this discussion"));
 
             if (!parentDc.getDiscussion().getDiscussionId().equals(discussionId)) {
-                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Parent comment does not belong to this discussion");
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                        "Parent comment does not belong to this discussion");
             }
         }
 
@@ -207,14 +215,14 @@ public class DiscussionService {
                 user.getUsername(),
                 parentComment != null ? parentComment.getCommentId() : null,
                 savedComment.getCreatedAt(),
-                savedComment.getUpdatedAt()
-        );
+                savedComment.getUpdatedAt());
     }
 
     @Transactional
     public CommentResponse replyToComment(Integer parentCommentId, CommentRequest request, String username) {
         DiscussionComment dc = discussionCommentRepository.findByComment_CommentId(parentCommentId)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Parent comment not found with id: " + parentCommentId));
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
+                        "Parent comment not found with id: " + parentCommentId));
 
         request.setParentCommentId(parentCommentId);
         return addComment(dc.getDiscussion().getDiscussionId(), request, username);
@@ -225,10 +233,12 @@ public class DiscussionService {
         User user = getAuthenticatedUser(username);
 
         Comment comment = commentRepository.findById(commentId)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Comment not found with id: " + commentId));
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
+                        "Comment not found with id: " + commentId));
 
         if (!comment.getUser().getUserId().equals(user.getUserId())) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "You do not have permission to update this comment");
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN,
+                    "You do not have permission to update this comment");
         }
 
         comment.setComment(request.getContent().trim());
@@ -245,8 +255,7 @@ public class DiscussionService {
                 user.getUsername(),
                 updatedComment.getParentComment() != null ? updatedComment.getParentComment().getCommentId() : null,
                 updatedComment.getCreatedAt(),
-                updatedComment.getUpdatedAt()
-        );
+                updatedComment.getUpdatedAt());
     }
 
     @Transactional
@@ -254,29 +263,27 @@ public class DiscussionService {
         User user = getAuthenticatedUser(username);
 
         Comment comment = commentRepository.findById(commentId)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Comment not found with id: " + commentId));
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
+                        "Comment not found with id: " + commentId));
 
         boolean isOwner = comment.getUser().getUserId().equals(user.getUserId());
         boolean isAdmin = user.getRole() != null && user.getRole().toUpperCase().contains("ADMIN");
 
         if (!isOwner && !isAdmin) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "You do not have permission to delete this comment");
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN,
+                    "You do not have permission to delete this comment");
         }
 
-        // Recursively find and delete all descendants and the comment itself
         List<Integer> allDescendantIds = new ArrayList<>();
         collectDescendantCommentIds(commentId, allDescendantIds);
         allDescendantIds.add(commentId);
 
-        // Delete comment reactions first
         commentReactionRepository.deleteByCommentIdIn(allDescendantIds);
 
-        // Delete discussion_comment mapping first
         for (Integer id : allDescendantIds) {
             discussionCommentRepository.deleteByCommentId(id);
         }
 
-        // Delete comments in reverse order (children before parents)
         deleteCommentsHierarchy(allDescendantIds);
     }
 
@@ -285,7 +292,8 @@ public class DiscussionService {
         User user = getAuthenticatedUser(username);
 
         Discussion discussion = discussionRepository.findById(discussionId)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Discussion not found with id: " + discussionId));
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
+                        "Discussion not found with id: " + discussionId));
 
         DiscussionReactionId reactionId = new DiscussionReactionId(user.getUserId(), discussionId);
         Optional<DiscussionReaction> existingReaction = discussionReactionRepository.findById(reactionId);
@@ -316,7 +324,6 @@ public class DiscussionService {
     }
 
     private void deleteCommentsHierarchy(List<Integer> commentIds) {
-        // Collect comments and build dependency graph for clean bottom-up deletion
         List<Comment> comments = commentRepository.findAllById(commentIds);
         Map<Integer, List<Comment>> parentToChildren = new HashMap<>();
         for (Comment c : comments) {
@@ -325,19 +332,18 @@ public class DiscussionService {
         }
 
         List<Comment> deletionOrder = new ArrayList<>();
-        // Post-order traversal starting from roots
         Set<Integer> visited = new HashSet<>();
         for (Comment c : comments) {
             visitPostOrder(c, parentToChildren, visited, deletionOrder);
         }
 
-        // Delete from leaves to roots
         for (Comment c : deletionOrder) {
             commentRepository.delete(c);
         }
     }
 
-    private void visitPostOrder(Comment node, Map<Integer, List<Comment>> parentToChildren, Set<Integer> visited, List<Comment> order) {
+    private void visitPostOrder(Comment node, Map<Integer, List<Comment>> parentToChildren, Set<Integer> visited,
+            List<Comment> order) {
         if (visited.contains(node.getCommentId())) {
             return;
         }

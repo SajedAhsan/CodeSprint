@@ -13,7 +13,8 @@ import java.util.Optional;
 @Repository
 public interface CommentAttachmentRepository extends JpaRepository<CommentAttachment, Integer> {
 
-    List<CommentAttachment> findByComment_CommentId(Integer commentId);
+    @Query("SELECT ca FROM CommentAttachment ca WHERE ca.comment.commentId = :commentId")
+    List<CommentAttachment> findByComment_CommentId(@Param("commentId") Integer commentId);
 
     @Query("SELECT ca.attachmentId FROM CommentAttachment ca WHERE ca.comment.commentId = :commentId")
     List<Integer> findAttachmentIdsByCommentId(@Param("commentId") Integer commentId);
@@ -33,5 +34,6 @@ public interface CommentAttachmentRepository extends JpaRepository<CommentAttach
     @Query("DELETE FROM CommentAttachment ca WHERE ca.attachmentId = :attachmentId")
     void deleteByAttachmentId(@Param("attachmentId") Integer attachmentId);
 
-    Optional<CommentAttachment> findByAttachment_AttachmentId(Integer attachmentId);
+    @Query("SELECT ca FROM CommentAttachment ca WHERE ca.attachmentId = :attachmentId")
+    Optional<CommentAttachment> findByAttachment_AttachmentId(@Param("attachmentId") Integer attachmentId);
 }

@@ -13,7 +13,8 @@ import java.util.Optional;
 @Repository
 public interface EditorialAttachmentRepository extends JpaRepository<EditorialAttachment, Integer> {
 
-    List<EditorialAttachment> findByEditorial_EditorialId(Integer editorialId);
+    @Query("SELECT ea FROM EditorialAttachment ea WHERE ea.editorial.editorialId = :editorialId")
+    List<EditorialAttachment> findByEditorial_EditorialId(@Param("editorialId") Integer editorialId);
 
     @Query("SELECT ea.attachmentId FROM EditorialAttachment ea WHERE ea.editorial.editorialId = :editorialId")
     List<Integer> findAttachmentIdsByEditorialId(@Param("editorialId") Integer editorialId);
@@ -26,5 +27,6 @@ public interface EditorialAttachmentRepository extends JpaRepository<EditorialAt
     @Query("DELETE FROM EditorialAttachment ea WHERE ea.attachmentId = :attachmentId")
     void deleteByAttachmentId(@Param("attachmentId") Integer attachmentId);
 
-    Optional<EditorialAttachment> findByAttachment_AttachmentId(Integer attachmentId);
+    @Query("SELECT ea FROM EditorialAttachment ea WHERE ea.attachmentId = :attachmentId")
+    Optional<EditorialAttachment> findByAttachment_AttachmentId(@Param("attachmentId") Integer attachmentId);
 }

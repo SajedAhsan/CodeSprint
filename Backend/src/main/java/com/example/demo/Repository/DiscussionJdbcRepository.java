@@ -75,16 +75,15 @@ public class DiscussionJdbcRepository {
                             updatedTs != null ? updatedTs.toLocalDateTime() : null,
                             rs.getLong("comment_count"),
                             rs.getLong("like_count"),
-                            rs.getBoolean("is_liked_by_current_user")
-                    );
+                            rs.getBoolean("is_liked_by_current_user"));
                 },
                 currentUserId,
-                problemId
-        );
+                problemId);
 
         if (!discussions.isEmpty()) {
             List<Integer> discIds = discussions.stream().map(DiscussionResponse::getDiscussionId).toList();
-            Map<Integer, List<AttachmentResponse>> attMap = attachmentJdbcRepository.findAttachmentsForDiscussionIds(discIds);
+            Map<Integer, List<AttachmentResponse>> attMap = attachmentJdbcRepository
+                    .findAttachmentsForDiscussionIds(discIds);
             for (DiscussionResponse disc : discussions) {
                 disc.setAttachments(attMap.getOrDefault(disc.getDiscussionId(), Collections.emptyList()));
             }
@@ -141,15 +140,14 @@ public class DiscussionJdbcRepository {
                             updatedTs != null ? updatedTs.toLocalDateTime() : null,
                             rs.getLong("comment_count"),
                             rs.getLong("like_count"),
-                            rs.getBoolean("is_liked_by_current_user")
-                    );
+                            rs.getBoolean("is_liked_by_current_user"));
                 },
                 currentUserId,
-                discussionId
-        );
+                discussionId);
 
         Optional<DiscussionResponse> optDisc = results.stream().findFirst();
-        optDisc.ifPresent(disc -> disc.setAttachments(attachmentJdbcRepository.findAttachmentsByDiscussionId(disc.getDiscussionId())));
+        optDisc.ifPresent(disc -> disc
+                .setAttachments(attachmentJdbcRepository.findAttachmentsByDiscussionId(disc.getDiscussionId())));
 
         return optDisc;
     }
@@ -187,21 +185,19 @@ public class DiscussionJdbcRepository {
                             rs.getString("author_username"),
                             parentId,
                             createdTs != null ? createdTs.toLocalDateTime() : null,
-                            updatedTs != null ? updatedTs.toLocalDateTime() : null
-                    );
+                            updatedTs != null ? updatedTs.toLocalDateTime() : null);
                 },
-                discussionId
-        );
+                discussionId);
 
         if (!flatComments.isEmpty()) {
             List<Integer> commentIds = flatComments.stream().map(CommentResponse::getCommentId).toList();
-            Map<Integer, List<AttachmentResponse>> attMap = attachmentJdbcRepository.findAttachmentsForCommentIds(commentIds);
+            Map<Integer, List<AttachmentResponse>> attMap = attachmentJdbcRepository
+                    .findAttachmentsForCommentIds(commentIds);
             for (CommentResponse c : flatComments) {
                 c.setAttachments(attMap.getOrDefault(c.getCommentId(), Collections.emptyList()));
             }
         }
 
-        // Build hierarchical tree
         Map<Integer, CommentResponse> commentMap = new LinkedHashMap<>();
         for (CommentResponse comment : flatComments) {
             commentMap.put(comment.getCommentId(), comment);
@@ -220,7 +216,8 @@ public class DiscussionJdbcRepository {
         return rootComments;
     }
 
-    public List<DiscussionDetailResponse> findDiscussionsWithDetailsByProblemId(Integer problemId, Integer currentUserId) {
+    public List<DiscussionDetailResponse> findDiscussionsWithDetailsByProblemId(Integer problemId,
+            Integer currentUserId) {
         List<DiscussionResponse> discussions = findDiscussionsByProblemId(problemId, currentUserId);
         if (discussions.isEmpty()) {
             return Collections.emptyList();
@@ -259,21 +256,19 @@ public class DiscussionJdbcRepository {
                             rs.getString("author_username"),
                             parentId,
                             createdTs != null ? createdTs.toLocalDateTime() : null,
-                            updatedTs != null ? updatedTs.toLocalDateTime() : null
-                    );
+                            updatedTs != null ? updatedTs.toLocalDateTime() : null);
                 },
-                problemId
-        );
+                problemId);
 
         if (!allComments.isEmpty()) {
             List<Integer> commentIds = allComments.stream().map(CommentResponse::getCommentId).toList();
-            Map<Integer, List<AttachmentResponse>> commentAttMap = attachmentJdbcRepository.findAttachmentsForCommentIds(commentIds);
+            Map<Integer, List<AttachmentResponse>> commentAttMap = attachmentJdbcRepository
+                    .findAttachmentsForCommentIds(commentIds);
             for (CommentResponse c : allComments) {
                 c.setAttachments(commentAttMap.getOrDefault(c.getCommentId(), Collections.emptyList()));
             }
         }
 
-        // Group comments by discussion_id
         Map<Integer, List<CommentResponse>> commentsByDiscussion = new HashMap<>();
         for (CommentResponse comment : allComments) {
             commentsByDiscussion.computeIfAbsent(comment.getDiscussionId(), k -> new ArrayList<>()).add(comment);
@@ -281,7 +276,8 @@ public class DiscussionJdbcRepository {
 
         List<DiscussionDetailResponse> result = new ArrayList<>();
         for (DiscussionResponse disc : discussions) {
-            List<CommentResponse> flatForDisc = commentsByDiscussion.getOrDefault(disc.getDiscussionId(), Collections.emptyList());
+            List<CommentResponse> flatForDisc = commentsByDiscussion.getOrDefault(disc.getDiscussionId(),
+                    Collections.emptyList());
 
             Map<Integer, CommentResponse> commentMap = new LinkedHashMap<>();
             for (CommentResponse c : flatForDisc) {

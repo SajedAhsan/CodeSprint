@@ -12,12 +12,14 @@ import org.springframework.stereotype.Repository;
 @Repository
 public interface DiscussionCommentRepository extends JpaRepository<DiscussionComment, Integer> {
 
-    List<DiscussionComment> findByDiscussion_DiscussionId(Integer discussionId);
+    @Query("SELECT dc FROM DiscussionComment dc WHERE dc.discussion.discussionId = :discussionId")
+    List<DiscussionComment> findByDiscussion_DiscussionId(@Param("discussionId") Integer discussionId);
 
     @Query("SELECT dc.commentId FROM DiscussionComment dc WHERE dc.discussion.discussionId = :discussionId")
     List<Integer> findCommentIdsByDiscussionId(@Param("discussionId") Integer discussionId);
 
-    Optional<DiscussionComment> findByComment_CommentId(Integer commentId);
+    @Query("SELECT dc FROM DiscussionComment dc WHERE dc.commentId = :commentId")
+    Optional<DiscussionComment> findByComment_CommentId(@Param("commentId") Integer commentId);
 
     @Modifying
     @Query("DELETE FROM DiscussionComment dc WHERE dc.discussion.discussionId = :discussionId")

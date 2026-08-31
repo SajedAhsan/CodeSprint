@@ -13,12 +13,14 @@ import java.util.Optional;
 @Repository
 public interface BlogCommentRepository extends JpaRepository<BlogComment, Integer> {
 
-    List<BlogComment> findByBlog_BlogId(Integer blogId);
+    @Query("SELECT bc FROM BlogComment bc WHERE bc.blog.blogId = :blogId")
+    List<BlogComment> findByBlog_BlogId(@Param("blogId") Integer blogId);
 
     @Query("SELECT bc.commentId FROM BlogComment bc WHERE bc.blog.blogId = :blogId")
     List<Integer> findCommentIdsByBlogId(@Param("blogId") Integer blogId);
 
-    Optional<BlogComment> findByComment_CommentId(Integer commentId);
+    @Query("SELECT bc FROM BlogComment bc WHERE bc.commentId = :commentId")
+    Optional<BlogComment> findByComment_CommentId(@Param("commentId") Integer commentId);
 
     @Modifying
     @Query("DELETE FROM BlogComment bc WHERE bc.blog.blogId = :blogId")

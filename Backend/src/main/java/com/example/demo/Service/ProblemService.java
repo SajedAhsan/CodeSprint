@@ -31,10 +31,10 @@ public class ProblemService {
     private final com.example.demo.Service.EditorialService editorialService;
 
     public ProblemService(ProblemRepository problemRepository,
-                          TopicRepository topicRepository,
-                          ProblemTopicRepository problemTopicRepository,
-                          UserRepository userRepository,
-                          com.example.demo.Service.EditorialService editorialService) {
+            TopicRepository topicRepository,
+            ProblemTopicRepository problemTopicRepository,
+            UserRepository userRepository,
+            com.example.demo.Service.EditorialService editorialService) {
         this.problemRepository = problemRepository;
         this.topicRepository = topicRepository;
         this.problemTopicRepository = problemTopicRepository;
@@ -152,12 +152,14 @@ public class ProblemService {
     private Map<Integer, String> topicNamesByProblemId() {
         Map<Integer, String> topicNamesByProblemId = new HashMap<>();
         for (ProblemTopic problemTopic : problemTopicRepository.findAll()) {
-            if (problemTopic.getId() == null || problemTopic.getId().getProblemId() == null || problemTopic.getId().getTopicId() == null) {
+            if (problemTopic.getId() == null || problemTopic.getId().getProblemId() == null
+                    || problemTopic.getId().getTopicId() == null) {
                 continue;
             }
 
             topicRepository.findById(problemTopic.getId().getTopicId())
-                    .ifPresent(topic -> topicNamesByProblemId.put(problemTopic.getId().getProblemId(), topic.getTopicName()));
+                    .ifPresent(topic -> topicNamesByProblemId.put(problemTopic.getId().getProblemId(),
+                            topic.getTopicName()));
         }
         return topicNamesByProblemId;
     }
@@ -168,13 +170,12 @@ public class ProblemService {
         }
 
         return topicRepository.findAll().stream()
-                .filter(topic -> problemTopicRepository.findAll().stream().anyMatch(problemTopic ->
-                        problemTopic.getId() != null
+                .filter(topic -> problemTopicRepository.findAll().stream()
+                        .anyMatch(problemTopic -> problemTopic.getId() != null
                                 && problemTopic.getId().getProblemId() != null
                                 && problemTopic.getId().getTopicId() != null
                                 && problemTopic.getId().getProblemId().equals(problemId)
-                                && problemTopic.getId().getTopicId().equals(topic.getTopicId())
-                ))
+                                && problemTopic.getId().getTopicId().equals(topic.getTopicId())))
                 .map(Topic::getTopicName)
                 .findFirst()
                 .orElse(null);
@@ -196,11 +197,9 @@ public class ProblemService {
         response.setAddedBy(problem.getAddedBy());
         response.setCreatedAt(problem.getCreatedAt());
         response.setUpdatedAt(problem.getUpdatedAt());
-        // attach editorial/solution if present
         try {
             response.setSolution(editorialService.getEditorialByProblemId(problem.getProblemId()));
         } catch (Exception ex) {
-            // ignore — don't fail problem listing for editorial errors
         }
         return response;
     }

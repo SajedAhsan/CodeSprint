@@ -43,7 +43,8 @@ public class BlogService {
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "User must be authenticated");
         }
         return userRepository.findUserByUsername(username.trim())
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Authenticated user not found"));
+                .orElseThrow(
+                        () -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Authenticated user not found"));
     }
 
     private Integer getUserIdOrNull(String username) {
@@ -76,8 +77,7 @@ public class BlogService {
                 savedBlog.getUpdatedAt(),
                 0L,
                 0L,
-                false
-        );
+                false);
     }
 
     @Transactional(readOnly = true)
@@ -92,7 +92,8 @@ public class BlogService {
 
         BlogResponse blogSummary = blogJdbcRepository
                 .findBlogSummaryById(blogId, currentUserId)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Blog not found with id: " + blogId));
+                .orElseThrow(
+                        () -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Blog not found with id: " + blogId));
 
         List<CommentResponse> nestedComments = blogJdbcRepository.findNestedCommentsByBlogId(blogId, currentUserId);
 
@@ -104,7 +105,8 @@ public class BlogService {
         User user = getAuthenticatedUser(username);
 
         Blog blog = blogRepository.findById(blogId)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Blog not found with id: " + blogId));
+                .orElseThrow(
+                        () -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Blog not found with id: " + blogId));
 
         if (!blog.getUser().getUserId().equals(user.getUserId())) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "You do not have permission to update this blog");
@@ -116,7 +118,8 @@ public class BlogService {
 
         return blogJdbcRepository
                 .findBlogSummaryById(blogId, user.getUserId())
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Failed to retrieve updated blog"));
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR,
+                        "Failed to retrieve updated blog"));
     }
 
     @Transactional
@@ -124,7 +127,8 @@ public class BlogService {
         User user = getAuthenticatedUser(username);
 
         Blog blog = blogRepository.findById(blogId)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Blog not found with id: " + blogId));
+                .orElseThrow(
+                        () -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Blog not found with id: " + blogId));
 
         boolean isOwner = blog.getUser().getUserId().equals(user.getUserId());
         boolean isAdmin = user.getRole() != null && user.getRole().toUpperCase().contains("ADMIN");
@@ -133,22 +137,16 @@ public class BlogService {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "You do not have permission to delete this blog");
         }
 
-        // Delete blog reactions
         blogReactionRepository.deleteByBlogId(blogId);
 
-        // Find comment IDs associated with this blog
         List<Integer> commentIds = blogCommentRepository.findCommentIdsByBlogId(blogId);
-
-        // Delete blog_comment mappings
         blogCommentRepository.deleteByBlogId(blogId);
 
-        // Delete comment reactions and comments
         if (!commentIds.isEmpty()) {
             commentReactionRepository.deleteByCommentIdIn(commentIds);
             deleteCommentsHierarchy(commentIds);
         }
 
-        // Delete blog entity
         blogRepository.delete(blog);
     }
 
@@ -157,19 +155,22 @@ public class BlogService {
         User user = getAuthenticatedUser(username);
 
         Blog blog = blogRepository.findById(blogId)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Blog not found with id: " + blogId));
+                .orElseThrow(
+                        () -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Blog not found with id: " + blogId));
 
         Comment parentComment = null;
         if (request.getParentCommentId() != null) {
             parentComment = commentRepository.findById(request.getParentCommentId())
-                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Parent comment not found with id: " + request.getParentCommentId()));
+                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
+                            "Parent comment not found with id: " + request.getParentCommentId()));
 
-            // Verify parent comment belongs to this blog
             BlogComment parentBc = blogCommentRepository.findByComment_CommentId(parentComment.getCommentId())
-                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "Parent comment does not belong to this blog"));
+                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                            "Parent comment does not belong to this blog"));
 
             if (!parentBc.getBlog().getBlogId().equals(blogId)) {
-                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Parent comment does not belong to this blog");
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                        "Parent comment does not belong to this blog");
             }
         }
 
@@ -193,14 +194,14 @@ public class BlogService {
                 savedComment.getCreatedAt(),
                 savedComment.getUpdatedAt(),
                 0L,
-                false
-        );
+                false);
     }
 
     @Transactional(readOnly = true)
     public List<CommentResponse> getCommentsByBlog(Integer blogId, String username) {
         blogRepository.findById(blogId)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Blog not found with id: " + blogId));
+                .orElseThrow(
+                        () -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Blog not found with id: " + blogId));
 
         Integer currentUserId = getUserIdOrNull(username);
         return blogJdbcRepository.findNestedCommentsByBlogId(blogId, currentUserId);
@@ -222,10 +223,12 @@ public class BlogService {
         User user = getAuthenticatedUser(username);
 
         Comment comment = commentRepository.findById(commentId)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Comment not found with id: " + commentId));
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
+                        "Comment not found with id: " + commentId));
 
         if (!comment.getUser().getUserId().equals(user.getUserId())) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "You do not have permission to update this comment");
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN,
+                    "You do not have permission to update this comment");
         }
 
         comment.setComment(request.getContent().trim());
@@ -250,8 +253,7 @@ public class BlogService {
                 updatedComment.getCreatedAt(),
                 updatedComment.getUpdatedAt(),
                 likeCount,
-                isLiked
-        );
+                isLiked);
     }
 
     @Transactional
@@ -259,29 +261,27 @@ public class BlogService {
         User user = getAuthenticatedUser(username);
 
         Comment comment = commentRepository.findById(commentId)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Comment not found with id: " + commentId));
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
+                        "Comment not found with id: " + commentId));
 
         boolean isOwner = comment.getUser().getUserId().equals(user.getUserId());
         boolean isAdmin = user.getRole() != null && user.getRole().toUpperCase().contains("ADMIN");
 
         if (!isOwner && !isAdmin) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "You do not have permission to delete this comment");
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN,
+                    "You do not have permission to delete this comment");
         }
 
-        // Recursively find and delete all descendants and the comment itself
         List<Integer> allDescendantIds = new ArrayList<>();
         collectDescendantCommentIds(commentId, allDescendantIds);
         allDescendantIds.add(commentId);
 
-        // Delete comment reactions
         commentReactionRepository.deleteByCommentIdIn(allDescendantIds);
 
-        // Delete blog_comment mapping
         for (Integer id : allDescendantIds) {
             blogCommentRepository.deleteByCommentId(id);
         }
 
-        // Delete comments in reverse order (children before parents)
         deleteCommentsHierarchy(allDescendantIds);
     }
 
@@ -290,7 +290,8 @@ public class BlogService {
         User user = getAuthenticatedUser(username);
 
         Blog blog = blogRepository.findById(blogId)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Blog not found with id: " + blogId));
+                .orElseThrow(
+                        () -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Blog not found with id: " + blogId));
 
         BlogReactionId reactionId = new BlogReactionId(user.getUserId(), blogId);
         Optional<BlogReaction> existingReaction = blogReactionRepository.findById(reactionId);
@@ -317,7 +318,8 @@ public class BlogService {
         User user = getAuthenticatedUser(username);
 
         Comment comment = commentRepository.findById(commentId)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Comment not found with id: " + commentId));
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
+                        "Comment not found with id: " + commentId));
 
         CommentReactionId reactionId = new CommentReactionId(user.getUserId(), commentId);
         Optional<CommentReaction> existingReaction = commentReactionRepository.findById(reactionId);
@@ -366,7 +368,8 @@ public class BlogService {
         }
     }
 
-    private void visitPostOrder(Comment node, Map<Integer, List<Comment>> parentToChildren, Set<Integer> visited, List<Comment> order) {
+    private void visitPostOrder(Comment node, Map<Integer, List<Comment>> parentToChildren, Set<Integer> visited,
+            List<Comment> order) {
         if (visited.contains(node.getCommentId())) {
             return;
         }
