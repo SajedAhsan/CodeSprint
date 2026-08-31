@@ -502,6 +502,21 @@ export default function ProblemPage({ onBack, initialTab = 'Discussion', problem
   const resolvedTab = TABS.includes(initialTab) ? initialTab : 'Discussion'
   const [activeTab, setActiveTab] = useState(resolvedTab)
 
+  useEffect(() => {
+    if (initialTab && TABS.includes(initialTab)) {
+      setActiveTab(initialTab)
+    }
+  }, [initialTab])
+
+  const handleTabChange = (tab) => {
+    setActiveTab(tab)
+    if (typeof window !== 'undefined') {
+      const pId = problem?.id ?? problem?.problemId
+      const url = `/problems?id=${pId}&tab=${tab}`
+      window.history.replaceState({ view: 'problems', problemId: pId, tab }, '', url)
+    }
+  }
+
   const [newDiscussionText, setNewDiscussionText] = useState('')
   const [isPostingDiscussion, setIsPostingDiscussion] = useState(false)
   const [pendingDiscussionFiles, setPendingDiscussionFiles] = useState([])
@@ -905,7 +920,7 @@ export default function ProblemPage({ onBack, initialTab = 'Discussion', problem
         <div className="border-b border-slate-200 px-5 py-3.5">
           <div className="flex gap-2">
             {TABS.map((tab) => (
-              <TabButton key={tab} active={activeTab === tab} onClick={() => setActiveTab(tab)}>
+              <TabButton key={tab} active={activeTab === tab} onClick={() => handleTabChange(tab)}>
                 {tab}
               </TabButton>
             ))}

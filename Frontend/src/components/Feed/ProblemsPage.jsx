@@ -332,8 +332,14 @@ export default function ProblemsPage({
   const [openNotesId, setOpenNotesId] = useState(null)
   const [openConceptId, setOpenConceptId] = useState(null)
 
-  const problemsByTopic = controlledProblemsByTopic || localProblemsByTopic
-  const setProblemsByTopic = controlledSetProblemsByTopic || setLocalProblemsByTopic
+  const hasControlledData = controlledProblemsByTopic && Object.keys(controlledProblemsByTopic).length > 0
+  const problemsByTopic = hasControlledData ? controlledProblemsByTopic : localProblemsByTopic
+  const setProblemsByTopic = (updater) => {
+    setLocalProblemsByTopic(updater)
+    if (typeof controlledSetProblemsByTopic === 'function') {
+      controlledSetProblemsByTopic(updater)
+    }
+  }
 
   useEffect(() => {
     const loadProblems = async () => {
@@ -341,8 +347,12 @@ export default function ProblemsPage({
         setLoadingProblems(true)
 
         const userId = getLoggedInUserId()
+        const token = localStorage.getItem('codesprintToken') || localStorage.getItem('token')
+        const headers = { Accept: 'application/json' }
+        if (token) headers['Authorization'] = `Bearer ${token}`
+
         const endpoint = userId ? `/api/problems/page/${userId}` : '/api/problems'
-        const response = await fetch(endpoint, { headers: { Accept: 'application/json' } })
+        const response = await fetch(endpoint, { headers })
         if (!response.ok) throw new Error('Unable to load problems')
 
         const payload = await response.json()
@@ -359,7 +369,7 @@ export default function ProblemsPage({
                 name: problem.title,
                 difficulty: problem.difficulty || 'Medium',
                 solved: Boolean(problem.userState?.solved),
-                bookmarked: Boolean(problem.userState?.bookmark),
+                bookmarked: Boolean(problem.userState?.bookmark || problem.userState?.bookmarked),
                 notes: problem.userState?.note || '',
                 concept: problem.description || '',
                 judgeUrl: 'https://codeforces.com/problemset',
@@ -406,16 +416,30 @@ export default function ProblemsPage({
         }
 
         const nextTopics = Object.keys(grouped).filter((topic) => grouped[topic].length > 0)
-        const nextProblemsByTopic = {
-          ...initializeAllProblems(),
-          ...grouped,
-        }
+        const nextProblemsByTopic = Object.keys(grouped).length > 0 ? grouped : initializeAllProblems()
 
         setTopics(nextTopics.length > 0 ? nextTopics : problemTopics)
         setProblemsByTopic(nextProblemsByTopic)
 
         if (nextTopics.length > 0 && !nextTopics.includes(selectedTopic)) {
           setSelectedTopic(nextTopics[0])
+        }
+
+        // Restore active problem / solution from URL query params (e.g. ?id=4&tab=Solution)
+        const searchParams = new URLSearchParams(window.location.search)
+        const urlProblemId = Number(searchParams.get('id') || searchParams.get('problemId'))
+        const urlTab = searchParams.get('tab') || 'Discussion'
+
+        if (urlProblemId) {
+          for (const [topName, probList] of Object.entries(nextProblemsByTopic)) {
+            const matched = probList.find((p) => p.id === urlProblemId)
+            if (matched) {
+              setActiveProblem(matched)
+              setInitialTab(urlTab === 'Solution' ? 'Solution' : 'Discussion')
+              setSelectedTopic(topName)
+              break
+            }
+          }
         }
       } catch (error) {
         console.error(error)
@@ -426,6 +450,32 @@ export default function ProblemsPage({
 
     loadProblems()
   }, [])
+
+  // Listen to popstate (browser Back/Forward) to toggle problem view or problem list
+  useEffect(() => {
+    const handlePopState = () => {
+      const searchParams = new URLSearchParams(window.location.search)
+      const urlProblemId = Number(searchParams.get('id') || searchParams.get('problemId'))
+      const urlTab = searchParams.get('tab') || 'Discussion'
+
+      if (urlProblemId && problemsByTopic) {
+        for (const [topName, probList] of Object.entries(problemsByTopic)) {
+          const matched = probList.find((p) => p.id === urlProblemId)
+          if (matched) {
+            setActiveProblem(matched)
+            setInitialTab(urlTab === 'Solution' ? 'Solution' : 'Discussion')
+            setSelectedTopic(topName)
+            return
+          }
+        }
+      } else {
+        setActiveProblem(null)
+      }
+    }
+
+    window.addEventListener('popstate', handlePopState)
+    return () => window.removeEventListener('popstate', handlePopState)
+  }, [problemsByTopic])
 
   /* ── Topic-level helpers ── */
   const updateRow = (id, patch) => {
@@ -463,16 +513,23 @@ export default function ProblemsPage({
   const updateNotes = (id, notes) => updateRow(id, { notes })
 
   /* ── Navigation to ProblemPage ── */
-  const openProblemWithTab = (row, tab) => {
+  const openProblemWithTab = (row, tab = 'Discussion') => {
     setInitialTab(tab)
     setActiveProblem(row)
+    const url = `/problems?id=${row.id}&tab=${tab}`
+    window.history.pushState({ view: 'problems', problemId: row.id, tab }, '', url)
+  }
+
+  const handleBackFromProblem = () => {
+    setActiveProblem(null)
+    window.history.pushState({ view: 'problems' }, '', '/problems')
   }
 
   /* ── Called by ProblemPage when discussion/solution changes ── */
   const handleUpdateProblem = (updatedProblem) => {
     setProblemsByTopic((prev) => ({
       ...prev,
-      [selectedTopic]: prev[selectedTopic].map((p) =>
+      [selectedTopic]: (prev[selectedTopic] || []).map((p) =>
         p.id === updatedProblem.id ? updatedProblem : p,
       ),
     }))
@@ -496,7 +553,7 @@ export default function ProblemsPage({
         />
         <section className="mx-auto max-w-[1200px] px-4 py-6 sm:px-6 lg:px-8">
           <ProblemPage
-            onBack={() => setActiveProblem(null)}
+            onBack={handleBackFromProblem}
             initialTab={initialTab}
             problem={activeProblem}
             onUpdateProblem={handleUpdateProblem}
