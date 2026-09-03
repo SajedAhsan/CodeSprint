@@ -24,13 +24,11 @@ export default function BlogNavbar({
   onNavigateProblems,
   onNavigatePostBlog,
   onNavigateProfile,
-  onNavigateRoadmap,
   onLogout,
 }) {
   const navItems = [
     { key: 'blog', label: 'Blog', onClick: onNavigateBlog },
     { key: 'problems', label: 'Problems', onClick: onNavigateProblems },
-    { key: 'roadmap', label: 'Roadmap', onClick: onNavigateRoadmap },
     { key: 'post-blog', label: 'Post Blog', onClick: onNavigatePostBlog },
   ]
 

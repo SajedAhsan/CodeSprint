@@ -319,7 +319,6 @@ export default function ProblemsPage({
   onNavigateProblems,
   onNavigatePostBlog,
   onNavigateProfile,
-  onNavigateRoadmap,
   onLogout,
   problemsByTopic: controlledProblemsByTopic,
   setProblemsByTopic: controlledSetProblemsByTopic,
@@ -550,7 +549,6 @@ export default function ProblemsPage({
           onNavigateProblems={onNavigateProblems}
           onNavigatePostBlog={onNavigatePostBlog}
           onNavigateProfile={onNavigateProfile}
-          onNavigateRoadmap={onNavigateRoadmap}
           onLogout={onLogout}
         />
         <section className="mx-auto max-w-[1200px] px-4 py-6 sm:px-6 lg:px-8">
@@ -574,7 +572,6 @@ export default function ProblemsPage({
         onNavigateProblems={onNavigateProblems}
         onNavigatePostBlog={onNavigatePostBlog}
         onNavigateProfile={onNavigateProfile}
-        onNavigateRoadmap={onNavigateRoadmap}
         onLogout={onLogout}
       />
 

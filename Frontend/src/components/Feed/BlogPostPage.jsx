@@ -40,7 +40,6 @@ export default function BlogPostPage({
   onNavigateProblems,
   onNavigatePostBlog,
   onNavigateProfile,
-  onNavigateRoadmap,
   onLogout,
   editingBlog = null,
   onBlogSaved,
@@ -200,7 +199,6 @@ export default function BlogPostPage({
         onNavigateProblems={onNavigateProblems}
         onNavigatePostBlog={onNavigatePostBlog}
         onNavigateProfile={onNavigateProfile}
-        onNavigateRoadmap={onNavigateRoadmap}
         onLogout={onLogout}
       />
 

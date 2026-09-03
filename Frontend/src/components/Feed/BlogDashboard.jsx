@@ -17,7 +17,6 @@ export default function BlogDashboard({
   onNavigateProblems,
   onNavigatePostBlog,
   onNavigateProfile,
-  onNavigateRoadmap,
   onEditBlog,
   onLogout,
 }) {
@@ -97,7 +96,6 @@ export default function BlogDashboard({
         onNavigateProblems={onNavigateProblems}
         onNavigatePostBlog={onNavigatePostBlog}
         onNavigateProfile={onNavigateProfile}
-        onNavigateRoadmap={onNavigateRoadmap}
         onLogout={onLogout}
       />
 

@@ -6,7 +6,6 @@ import BlogDashboard from './components/Feed/BlogDashboard'
 import ProblemsPage from './components/Feed/ProblemsPage'
 import BlogPostPage from './components/Feed/BlogPostPage'
 import ProfilePage from './components/Profile/ProfilePage'
-import RoadmapPage from './components/Roadmap/RoadmapPage'
 import AdminDashboard from './components/Admin/AdminDashboard'
 import { createInitialBlogPosts } from './components/Shared/platformContent'
 
@@ -17,7 +16,6 @@ const VIEW_TO_PATH = {
   problems: '/problems',
   'post-blog': '/post-blog',
   profile: '/profile',
-  roadmap: '/roadmap',
   admin: '/admin',
 }
 
@@ -35,7 +33,6 @@ const PATH_TO_VIEW = {
   '/post-blog': 'post-blog',
   '/create-blog': 'post-blog',
   '/profile': 'profile',
-  '/roadmap': 'roadmap',
   '/admin': 'admin',
 }
 
@@ -171,7 +168,6 @@ export default function App(props) {
         onNavigateBlog={() => navigate('feed')}
         onNavigatePostBlog={handleNavigatePostBlog}
         onNavigateProfile={() => navigate('profile')}
-        onNavigateRoadmap={() => navigate('roadmap')}
         problemsByTopic={problemsByTopic}
         setProblemsByTopic={setProblemsByTopic}
         blogPosts={blogPosts}
@@ -190,7 +186,6 @@ export default function App(props) {
         onNavigateBlog={() => navigate('feed')}
         onNavigatePostBlog={handleNavigatePostBlog}
         onNavigateProfile={() => navigate('profile')}
-        onNavigateRoadmap={() => navigate('roadmap')}
         onEditBlog={handleEditBlog}
         blogPosts={blogPosts}
         {...props}
@@ -207,7 +202,6 @@ export default function App(props) {
         onNavigateBlog={() => navigate('feed')}
         onNavigatePostBlog={handleNavigatePostBlog}
         onNavigateProfile={() => navigate('profile')}
-        onNavigateRoadmap={() => navigate('roadmap')}
         problemsByTopic={problemsByTopic}
         setProblemsByTopic={setProblemsByTopic}
         {...props}
@@ -224,7 +218,6 @@ export default function App(props) {
         onNavigateBlog={() => navigate('feed')}
         onNavigatePostBlog={handleNavigatePostBlog}
         onNavigateProfile={() => navigate('profile')}
-        onNavigateRoadmap={() => navigate('roadmap')}
         editingBlog={editingBlog}
         onBlogSaved={() => setEditingBlog(null)}
         {...props}
@@ -241,22 +234,6 @@ export default function App(props) {
         onNavigateBlog={() => navigate('feed')}
         onNavigatePostBlog={handleNavigatePostBlog}
         onNavigateProfile={() => navigate('profile')}
-        onNavigateRoadmap={() => navigate('roadmap')}
-        blogPosts={blogPosts}
-        {...props}
-      />
-    )
-  }
-
-  if (view === 'roadmap') {
-    return (
-      <RoadmapPage
-        onLogout={handleLogout}
-        onNavigateBlog={() => navigate('feed')}
-        onNavigateProblems={() => navigate('problems')}
-        onNavigatePostBlog={handleNavigatePostBlog}
-        onNavigateProfile={() => navigate('profile')}
-        onNavigateRoadmap={() => navigate('roadmap')}
         blogPosts={blogPosts}
         {...props}
       />
