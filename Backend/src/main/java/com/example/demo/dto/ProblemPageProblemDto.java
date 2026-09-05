@@ -8,6 +8,7 @@ public class ProblemPageProblemDto {
         private String title;
         private String description;
         private String difficulty;
+        private String externalLink;
         private UserProblemStateDto userState;
 
         public ProblemPageProblemDto(
@@ -15,11 +16,13 @@ public class ProblemPageProblemDto {
                         String title,
                         String description,
                         String difficulty,
+                        String externalLink,
                         UserProblemStateDto userState) {
                 this.problemId = problemId;
                 this.title = title;
                 this.description = description;
                 this.difficulty = difficulty;
+                this.externalLink = externalLink;
                 this.userState = userState;
         }
 
@@ -37,6 +40,10 @@ public class ProblemPageProblemDto {
 
         public String getDifficulty() {
                 return difficulty;
+        }
+
+        public String getExternalLink() {
+                return externalLink;
         }
 
         public UserProblemStateDto getUserState() {
@@ -59,6 +66,10 @@ public class ProblemPageProblemDto {
                 this.difficulty = difficulty;
         }
 
+        public void setExternalLink(String externalLink) {
+                this.externalLink = externalLink;
+        }
+
         public void setUserState(UserProblemStateDto userState) {
                 this.userState = userState;
         }
@@ -76,6 +87,7 @@ public class ProblemPageProblemDto {
                                 && Objects.equals(title, that.title)
                                 && Objects.equals(description, that.description)
                                 && Objects.equals(difficulty, that.difficulty)
+                                && Objects.equals(externalLink, that.externalLink)
                                 && Objects.equals(userState, that.userState);
         }
 
@@ -86,6 +98,7 @@ public class ProblemPageProblemDto {
                                 title,
                                 description,
                                 difficulty,
+                                externalLink,
                                 userState);
         }
 
@@ -97,6 +110,7 @@ public class ProblemPageProblemDto {
                                 ", title='" + title + '\'' +
                                 ", description='" + description + '\'' +
                                 ", difficulty='" + difficulty + '\'' +
+                                ", externalLink='" + externalLink + '\'' +
                                 ", userState=" + userState +
                                 '}';
         }

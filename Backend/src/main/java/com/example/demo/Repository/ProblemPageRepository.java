@@ -1,17 +1,18 @@
 package com.example.demo.Repository;
 
-import com.example.demo.dto.ProblemPageProblemDto;
-import com.example.demo.dto.ProblemPageResponse;
-import com.example.demo.dto.ProblemPageTopicDto;
-import com.example.demo.dto.UserProblemStateDto;
-import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.stereotype.Repository;
-
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.stereotype.Repository;
+
+import com.example.demo.dto.ProblemPageProblemDto;
+import com.example.demo.dto.ProblemPageResponse;
+import com.example.demo.dto.ProblemPageTopicDto;
+import com.example.demo.dto.UserProblemStateDto;
 
 @Repository
 public class ProblemPageRepository {
@@ -33,6 +34,7 @@ public class ProblemPageRepository {
                                     p.title,
                                     COALESCE(p.concept, '') AS description,
                                     UPPER(COALESCE(p.difficulty, 'MEDIUM')) AS difficulty,
+                                    p.external_link,
 
                                     up.user_id AS state_user_id,
                                     up.bookmark,
@@ -66,6 +68,7 @@ public class ProblemPageRepository {
                                                 rs.getString("title"),
                                                 rs.getString("description"),
                                                 rs.getString("difficulty"),
+                                                rs.getString("external_link"),
 
                                                 (Integer) rs.getObject("state_user_id"),
                                                 (Boolean) rs.getObject("bookmark"),
@@ -98,6 +101,7 @@ public class ProblemPageRepository {
                                         row.title(),
                                         row.description(),
                                         row.difficulty(),
+                                        row.externalLink(),
                                         userState);
 
                         problemsByTopicId
@@ -134,6 +138,7 @@ public class ProblemPageRepository {
                         String title,
                         String description,
                         String difficulty,
+                        String externalLink,
 
                         Integer stateUserId,
                         Boolean bookmark,

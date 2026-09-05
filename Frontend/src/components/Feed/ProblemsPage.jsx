@@ -372,7 +372,7 @@ export default function ProblemsPage({
                 bookmarked: Boolean(problem.userState?.bookmark || problem.userState?.bookmarked),
                 notes: problem.userState?.note || '',
                 concept: problem.description || '',
-                judgeUrl: 'https://codeforces.com/problemset',
+                judgeUrl: problem.externalLink || 'https://codeforces.com/problemset',
                 solution: {
                   explanation: problem.description || 'No description provided yet.',
                   codes: {},
@@ -678,8 +678,8 @@ export default function ProblemsPage({
                           <td className="px-3 py-3.5 text-center">
                             <span className={[
                               'inline-flex rounded-full px-2.5 py-0.5 text-[11px] font-bold select-none',
-                              row.difficulty === 'Easy' ? 'bg-emerald-100 text-emerald-700' :
-                                row.difficulty === 'Medium' ? 'bg-amber-100 text-amber-700' :
+                              row.difficulty?.toLowerCase() === 'easy' ? 'bg-emerald-100 text-emerald-700' :
+                                row.difficulty?.toLowerCase() === 'medium' ? 'bg-amber-100 text-amber-700' :
                                   'bg-rose-100 text-rose-700',
                             ].join(' ')}>
                               {row.difficulty}
